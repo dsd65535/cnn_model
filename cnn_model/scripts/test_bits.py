@@ -22,9 +22,13 @@ def main(
     lr: float = 1e-3,
     count_epoch: int = 5,
     batch_size: int = 1,
+    bias: bool = False,
 ) -> None:
-    # pylint:disable=too-many-locals,duplicate-code
+    # pylint:disable=too-many-locals,duplicate-code,too-many-arguments
     """Test the effects of quantization"""
+
+    layer_0_params = "layers.0.bias" if bias else "layers.0.weight"
+    layer_4_params = "layers.4.bias" if bias else "layers.4.weight"
 
     device = get_device()
 
@@ -53,10 +57,10 @@ def main(
         for bits_4 in range(max_bits):
             # pylint:disable=cell-var-from-loop
             new_state_dict = {k: v.clone() for k, v in original_state_dict.items()}
-            new_state_dict["layers.0.weight"].apply_(
+            new_state_dict[layer_0_params].apply_(
                 lambda val: quantize(val, ref, bits_0)
             )
-            new_state_dict["layers.4.weight"].apply_(
+            new_state_dict[layer_4_params].apply_(
                 lambda val: quantize(val, ref, bits_4)
             )
             model.load_state_dict(new_state_dict)

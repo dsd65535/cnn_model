@@ -25,8 +25,17 @@ class Ideal(torch.nn.Module):
 
         super().__init__()
 
-        conv_out_size = 1 + (in_size + 2 * padding - kernel_size) // stride
-        flattened_size = (conv_out_size // pool_size) ** 2 * conv_out_channels
+        conv_out_size, rem = divmod(
+            in_size + stride + 2 * padding - kernel_size, stride
+        )
+        if rem:
+            raise ValueError("Invalid Convolution Output Size")
+
+        pool_out_size, rem = divmod(conv_out_size, pool_size)
+        if rem:
+            raise ValueError("Invalid Pool Output Size")
+
+        flattened_size = pool_out_size**2 * conv_out_channels
 
         self.layers = torch.nn.Sequential(
             torch.nn.Conv2d(

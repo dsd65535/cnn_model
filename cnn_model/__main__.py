@@ -37,11 +37,21 @@ def get_mnist(
 
 
 def main(
+    *,
     lr: float = 1e-3,
     count_epoch: int = 5,
     batch_size: int = 1,
     print_rate: int = 1000,
+    in_size: int = 28,
+    in_channels: int = 1,
+    conv_out_channels: int = 32,
+    kernel_size: int = 5,
+    stride: int = 1,
+    padding: int = 0,
+    pool_size: int = 2,
+    feature_count: int = 10,
 ) -> None:
+    # pylint:disable=too-many-arguments,too-many-locals
     """Train and Test the Ideal model
 
     This function is based on:
@@ -52,7 +62,16 @@ def main(
 
     train_dataloader, test_dataloader = get_mnist(batch_size=batch_size)
 
-    model = Ideal().to(device)
+    model = Ideal(
+        in_size=in_size,
+        in_channels=in_channels,
+        conv_out_channels=conv_out_channels,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+        pool_size=pool_size,
+        feature_count=feature_count,
+    ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 

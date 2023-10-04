@@ -9,14 +9,33 @@ class Ideal(torch.nn.Module):
     Circuits and System Design Framework for Machine Learning Applications.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        in_size: int = 28,
+        in_channels: int = 1,
+        conv_out_channels: int = 32,
+        kernel_size: int = 5,
+        stride: int = 1,
+        padding: int = 0,
+        pool_size: int = 2,
+        feature_count: int = 10,
+    ) -> None:
+        # pylint:disable=too-many-arguments
+
         super().__init__()
+
+        conv_out_size = 1 + (in_size + 2 * padding - kernel_size) // stride
+        flattened_size = (conv_out_size // pool_size) ** 2 * conv_out_channels
+
         self.layers = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 32, 5),
+            torch.nn.Conv2d(
+                in_channels, conv_out_channels, kernel_size, stride, padding
+            ),
             torch.nn.ReLU(),
-            torch.nn.MaxPool2d(2),
+            torch.nn.MaxPool2d(pool_size),
             torch.nn.Flatten(),
-            torch.nn.Linear(4608, 10),
+            torch.nn.Linear(flattened_size, feature_count),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

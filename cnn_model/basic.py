@@ -17,6 +17,20 @@ def get_device() -> str:
     return "cpu"
 
 
+def extract_shape(dataloader: torch.utils.data.DataLoader) -> Tuple[torch.Size, int]:
+    """Extract the tensor shape and number of labels in a dataloader"""
+
+    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)
+    if len(shape_set) < 1:
+        raise RuntimeError("Empty Dataloader")
+    if len(shape_set) > 1:
+        raise RuntimeError("Inconsistent Dataloader")
+
+    label_set = set(label for _, label in dataloader.dataset)
+
+    return shape_set.pop(), len(label_set)
+
+
 def train_model(
     model: torch.nn.Module,
     dataloader: torch.utils.data.DataLoader,

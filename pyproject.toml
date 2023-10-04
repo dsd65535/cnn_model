@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "cnn-model"
+version = "0.1.0"
+description = ""
+authors = ["Dimitar Dimitrov <dimitrov.d@northeastern.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

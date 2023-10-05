@@ -1,7 +1,11 @@
 """This script test the effects of quantization on accuracy"""
+from pathlib import Path
+
 import torch
 
+from cnn_model.__main__ import get_input_parameters
 from cnn_model.__main__ import get_mnist
+from cnn_model.__main__ import MODELCACHEDIR
 from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
@@ -22,7 +26,13 @@ def main(
     lr: float = 1e-3,
     count_epoch: int = 5,
     batch_size: int = 1,
+    conv_out_channels: int = 32,
+    kernel_size: int = 5,
+    stride: int = 1,
+    padding: int = 0,
+    pool_size: int = 2,
     bias: bool = False,
+    retrain: bool = False,
 ) -> None:
     # pylint:disable=too-many-locals,duplicate-code,too-many-arguments
     """Test the effects of quantization"""
@@ -33,21 +43,45 @@ def main(
     device = get_device()
 
     train_dataloader, test_dataloader = get_mnist(batch_size=batch_size)
+    in_channels, in_size, feature_count = get_input_parameters(
+        train_dataloader, test_dataloader
+    )
 
-    model = Ideal().to(device)
+    model = Ideal(
+        in_size=in_size,
+        in_channels=in_channels,
+        conv_out_channels=conv_out_channels,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+        pool_size=pool_size,
+        feature_count=feature_count,
+    ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
-    for idx_epoch in range(count_epoch):
-        print(f"epoch {idx_epoch+1}/{count_epoch}...")
-        train_model(
-            model,
-            train_dataloader,
-            loss_fn,
-            optimizer,
-            device=device,
-        )
-    print("model trained...")
+    cache_filepath = Path(
+        f"{MODELCACHEDIR}/ideal_mnist_"
+        f"{lr}_{count_epoch}_{batch_size}_"
+        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}.pth"
+    )
+
+    if retrain or not cache_filepath.exists():
+        for idx_epoch in range(count_epoch):
+            print(f"epoch {idx_epoch+1}/{count_epoch}...")
+            train_model(
+                model,
+                train_dataloader,
+                loss_fn,
+                optimizer,
+                device=device,
+            )
+        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), cache_filepath)
+        print("model trained...")
+    else:
+        model.load_state_dict(torch.load(cache_filepath))
+        print("model loaded...")
 
     results = test_model(model, test_dataloader, loss_fn, device=device)
     print(f"floats: {results[1]}")

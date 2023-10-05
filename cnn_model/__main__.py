@@ -1,4 +1,5 @@
 """This script demonstrates high-level functionality"""
+from pathlib import Path
 from typing import Tuple
 
 import torch
@@ -10,13 +11,16 @@ from cnn_model.basic import test_model
 from cnn_model.basic import train_model
 from cnn_model.models import Ideal
 
-DATACACHEDIR = "cache/data"
+DATACACHEDIR = Path("cache/data")
+MODELCACHEDIR = Path("cache/models")
 
 
 def get_mnist(
     batch_size: int = 1,
 ) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     """Get MNIST dataset"""
+
+    DATACACHEDIR.mkdir(parents=True, exist_ok=True)
 
     training_data = torchvision.datasets.MNIST(
         root=DATACACHEDIR,
@@ -66,12 +70,13 @@ def main(
     lr: float = 1e-3,
     count_epoch: int = 5,
     batch_size: int = 1,
-    print_rate: int = 1000,
     conv_out_channels: int = 32,
     kernel_size: int = 5,
     stride: int = 1,
     padding: int = 0,
     pool_size: int = 2,
+    print_rate: int = 1000,
+    retrain: bool = False,
 ) -> None:
     # pylint:disable=too-many-arguments,too-many-locals
     """Train and Test the Ideal model
@@ -100,20 +105,39 @@ def main(
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
-    for idx_epoch in range(count_epoch):
-        print(f"Epoch {idx_epoch+1}/{count_epoch}:")
-        train_model(
-            model,
-            train_dataloader,
-            loss_fn,
-            optimizer,
-            device=device,
-            print_rate=print_rate,
-        )
-        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        print(f"Average Loss:  {avg_loss:<9f}")
-        print(f"Accuracy:      {(100*accuracy):<0.4f}%")
-        print()
+    cache_filepath = Path(
+        f"{MODELCACHEDIR}/ideal_mnist_"
+        f"{lr}_{count_epoch}_{batch_size}_"
+        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}.pth"
+    )
+
+    if retrain or not cache_filepath.exists():
+        for idx_epoch in range(count_epoch):
+            print(f"Epoch {idx_epoch+1}/{count_epoch}:")
+            train_model(
+                model,
+                train_dataloader,
+                loss_fn,
+                optimizer,
+                device=device,
+                print_rate=print_rate,
+            )
+            if idx_epoch < count_epoch - 1:
+                avg_loss, accuracy = test_model(
+                    model, test_dataloader, loss_fn, device=device
+                )
+                print(f"Average Loss:  {avg_loss:<9f}")
+                print(f"Accuracy:      {(100*accuracy):<0.4f}%")
+                print()
+
+        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), cache_filepath)
+    else:
+        model.load_state_dict(torch.load(cache_filepath))
+
+    avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
+    print(f"Average Loss:  {avg_loss:<9f}")
+    print(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,20 @@
 import torch
 
 
+class ReLU(torch.nn.Module):
+    """Re-implementation of ReLU"""
+
+    def __init__(self, cutoff: float = 0.0) -> None:
+        super().__init__()
+
+        self.cutoff = torch.tensor([cutoff])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward function"""
+
+        return torch.max(self.cutoff.to(x.device), x)
+
+
 class Ideal(torch.nn.Module):
     """An ideal version of the CNN architecture presented in:
 
@@ -20,6 +34,7 @@ class Ideal(torch.nn.Module):
         padding: int = 0,
         pool_size: int = 2,
         feature_count: int = 10,
+        relu_cutoff: float = 0.5,
     ) -> None:
         # pylint:disable=too-many-arguments
 
@@ -41,7 +56,7 @@ class Ideal(torch.nn.Module):
             torch.nn.Conv2d(
                 in_channels, conv_out_channels, kernel_size, stride, padding
             ),
-            torch.nn.ReLU(),
+            ReLU(relu_cutoff),
             torch.nn.MaxPool2d(pool_size),
             torch.nn.Flatten(),
             torch.nn.Linear(flattened_size, feature_count),

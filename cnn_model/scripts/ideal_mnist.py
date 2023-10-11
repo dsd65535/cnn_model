@@ -77,6 +77,7 @@ def train_and_test_ideal_mnist(
     stride: int = 1,
     padding: int = 0,
     pool_size: int = 2,
+    relu_cutoff: float = 0.0,
     print_rate: Optional[int] = None,
     use_cache: bool = True,
     retrain: bool = False,
@@ -104,6 +105,7 @@ def train_and_test_ideal_mnist(
         padding=padding,
         pool_size=pool_size,
         feature_count=feature_count,
+        relu_cutoff=relu_cutoff,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -111,7 +113,8 @@ def train_and_test_ideal_mnist(
     cache_filepath = Path(
         f"{MODELCACHEDIR}/ideal_mnist_"
         f"{lr}_{count_epoch}_{batch_size}_"
-        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}.pth"
+        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
+        f"_{relu_cutoff}.pth"
     )
 
     if not use_cache or retrain or not cache_filepath.exists():
@@ -163,6 +166,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--padding", type=int, default=0)
     parser.add_argument("--pool_size", type=int, default=2)
+    parser.add_argument("--relu_cutoff", type=float, default=0.0)
     parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
@@ -188,6 +192,7 @@ def main() -> None:
         stride=args.stride,
         padding=args.padding,
         pool_size=args.pool_size,
+        relu_cutoff=args.relu_cutoff,
         print_rate=args.print_rate,
         use_cache=not args.no_cache,
         retrain=args.retrain,

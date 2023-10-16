@@ -76,6 +76,7 @@ def train_and_test_ideal_mnist(
     padding: int = 0,
     pool_size: int = 2,
     print_rate: Optional[int] = None,
+    use_cache: bool = True,
     retrain: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
@@ -111,7 +112,7 @@ def train_and_test_ideal_mnist(
         f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}.pth"
     )
 
-    if retrain or not cache_filepath.exists():
+    if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(count_epoch):
             if print_rate is not None:
                 print(f"Epoch {idx_epoch+1}/{count_epoch}:")
@@ -131,8 +132,9 @@ def train_and_test_ideal_mnist(
                 print(f"Accuracy:      {(100*accuracy):<0.4f}%")
                 print()
 
-        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-        torch.save(model.state_dict(), cache_filepath)
+        if use_cache:
+            MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), cache_filepath)
     else:
         model.load_state_dict(torch.load(cache_filepath))
 

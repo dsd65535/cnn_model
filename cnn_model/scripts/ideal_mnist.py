@@ -78,6 +78,8 @@ def train_and_test_ideal_mnist(
     padding: int = 0,
     pool_size: int = 2,
     relu_cutoff: float = 0.0,
+    relu_out_noise: Optional[float] = None,
+    linear_out_noise: Optional[float] = None,
     print_rate: Optional[int] = None,
     use_cache: bool = True,
     retrain: bool = False,
@@ -106,6 +108,8 @@ def train_and_test_ideal_mnist(
         pool_size=pool_size,
         feature_count=feature_count,
         relu_cutoff=relu_cutoff,
+        relu_out_noise=relu_out_noise,
+        linear_out_noise=linear_out_noise,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -114,7 +118,7 @@ def train_and_test_ideal_mnist(
         f"{MODELCACHEDIR}/ideal_mnist_"
         f"{lr}_{count_epoch}_{batch_size}_"
         f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
-        f"_{relu_cutoff}.pth"
+        f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}.pth"
     )
 
     if not use_cache or retrain or not cache_filepath.exists():
@@ -167,6 +171,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--padding", type=int, default=0)
     parser.add_argument("--pool_size", type=int, default=2)
     parser.add_argument("--relu_cutoff", type=float, default=0.0)
+    parser.add_argument("--relu_out_noise", type=float, nargs="?")
+    parser.add_argument("--linear_out_noise", type=float, nargs="?")
     parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
@@ -193,6 +199,8 @@ def main() -> None:
         padding=args.padding,
         pool_size=args.pool_size,
         relu_cutoff=args.relu_cutoff,
+        relu_out_noise=args.relu_out_noise,
+        linear_out_noise=args.linear_out_noise,
         print_rate=args.print_rate,
         use_cache=not args.no_cache,
         retrain=args.retrain,

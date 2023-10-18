@@ -1,5 +1,6 @@
 """This module defines pyTorch modules and layers"""
 import math
+from typing import Optional
 
 import torch
 
@@ -7,21 +8,29 @@ import torch
 class ReLU(torch.nn.Module):
     """Re-implementation of ReLU"""
 
-    def __init__(self, cutoff: float = 0.0) -> None:
+    def __init__(self, cutoff: float = 0.0, out_noise: Optional[float] = None) -> None:
         super().__init__()
 
         self.cutoff = torch.tensor([cutoff])
 
+        self.out_noise = out_noise
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward function"""
 
-        return torch.max(self.cutoff.to(x.device), x)
+        out = torch.max(self.cutoff.to(x.device), x)
+        if self.out_noise is not None:
+            out = torch.add(out, self.out_noise * torch.randn(out.shape).to(out.device))
+
+        return out
 
 
 class Linear(torch.nn.Module):
     """Re-implementation of Linear"""
 
-    def __init__(self, in_features: int, out_features: int) -> None:
+    def __init__(
+        self, in_features: int, out_features: int, out_noise: Optional[float] = None
+    ) -> None:
         super().__init__()
 
         self.in_features, self.out_features = in_features, out_features
@@ -33,10 +42,16 @@ class Linear(torch.nn.Module):
         bound = 1 / math.sqrt(in_features)
         torch.nn.init.uniform_(self.bias, -bound, bound)
 
+        self.out_noise = out_noise
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward function"""
 
-        return torch.add(torch.mm(x, self.weight.t()), self.bias)
+        out = torch.add(torch.mm(x, self.weight.t()), self.bias)
+        if self.out_noise is not None:
+            out = torch.add(out, self.out_noise * torch.randn(out.shape).to(out.device))
+
+        return out
 
 
 class Ideal(torch.nn.Module):
@@ -58,8 +73,10 @@ class Ideal(torch.nn.Module):
         pool_size: int = 2,
         feature_count: int = 10,
         relu_cutoff: float = 0.5,
+        relu_out_noise: Optional[float] = None,
+        linear_out_noise: Optional[float] = None,
     ) -> None:
-        # pylint:disable=too-many-arguments
+        # pylint:disable=too-many-arguments,too-many-locals
 
         super().__init__()
 
@@ -79,10 +96,10 @@ class Ideal(torch.nn.Module):
             torch.nn.Conv2d(
                 in_channels, conv_out_channels, kernel_size, stride, padding
             ),
-            ReLU(relu_cutoff),
+            ReLU(relu_cutoff, relu_out_noise),
             torch.nn.MaxPool2d(pool_size),
             torch.nn.Flatten(),
-            Linear(flattened_size, feature_count),
+            Linear(flattened_size, feature_count, linear_out_noise),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

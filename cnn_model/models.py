@@ -5,6 +5,23 @@ from typing import Optional
 import torch
 
 
+class Normalize(torch.nn.Module):
+    """Layer that convers to a realistic voltage"""
+
+    def __init__(
+        self, min_out: float, max_out: float, min_in: float = 0.0, max_in: float = 1.0
+    ) -> None:
+        super().__init__()
+
+        self.slope = (max_out - min_out) / (max_in - min_in)
+        self.offset = min_out - self.slope * min_in
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward function"""
+
+        return torch.add(self.offset, torch.multiply(self.slope, x))
+
+
 class ReLU(torch.nn.Module):
     """Re-implementation of ReLU"""
 
@@ -64,6 +81,10 @@ class Ideal(torch.nn.Module):
     def __init__(
         self,
         *,
+        min_out: float = 0.0,
+        max_out: float = 1.0,
+        min_in: float = 0.0,
+        max_in: float = 1.0,
         in_size: int = 28,
         in_channels: int = 1,
         conv_out_channels: int = 32,
@@ -93,6 +114,7 @@ class Ideal(torch.nn.Module):
         flattened_size = pool_out_size**2 * conv_out_channels
 
         self.layers = torch.nn.Sequential(
+            Normalize(min_out, max_out, min_in, max_in),
             torch.nn.Conv2d(
                 in_channels, conv_out_channels, kernel_size, stride, padding
             ),

@@ -39,6 +39,7 @@ def train_model(
     *,
     device: str = "cpu",
     print_rate: Optional[int] = None,
+    noise: Optional[float] = None,
 ) -> None:
     # pylint:disable=too-many-arguments
     """Train a model on a dataloader"""
@@ -52,6 +53,11 @@ def train_model(
     for idx_batch, (tensor_in, correct_label) in enumerate(dataloader):
         tensor_in = tensor_in.to(device)
         correct_label = correct_label.to(device)
+
+        if noise is not None:
+            tensor_in = torch.add(
+                tensor_in, noise * torch.randn(tensor_in.shape).to(device)
+            )
 
         prediction = model(tensor_in)
         loss = loss_fn(prediction, correct_label)
@@ -72,6 +78,7 @@ def test_model(
     loss_fn: torch.nn.Module,
     *,
     device: str = "cpu",
+    noise: Optional[float] = None,
 ) -> Tuple[float, float]:
     """Test a model on a dataloader"""
 
@@ -83,6 +90,11 @@ def test_model(
         for tensor_in, correct_label in dataloader:
             tensor_in = tensor_in.to(device)
             correct_label = correct_label.to(device)
+
+            if noise is not None:
+                tensor_in = torch.add(
+                    tensor_in, noise * torch.randn(tensor_in.shape).to(device)
+                )
 
             prediction = model(tensor_in)
             loss = loss_fn(prediction, correct_label)

@@ -1,4 +1,6 @@
 """This module defines pyTorch modules and layers"""
+import math
+
 import torch
 
 
@@ -14,6 +16,27 @@ class ReLU(torch.nn.Module):
         """Forward function"""
 
         return torch.max(self.cutoff.to(x.device), x)
+
+
+class Linear(torch.nn.Module):
+    """Re-implementation of Linear"""
+
+    def __init__(self, in_features: int, out_features: int) -> None:
+        super().__init__()
+
+        self.in_features, self.out_features = in_features, out_features
+
+        self.weight = torch.nn.Parameter(torch.Tensor(out_features, in_features))
+        self.bias = torch.nn.Parameter(torch.Tensor(out_features))
+
+        torch.nn.init.kaiming_uniform_(self.weight, nonlinearity="relu")
+        bound = 1 / math.sqrt(in_features)
+        torch.nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward function"""
+
+        return torch.add(torch.mm(x, self.weight.t()), self.bias)
 
 
 class Ideal(torch.nn.Module):
@@ -59,7 +82,7 @@ class Ideal(torch.nn.Module):
             ReLU(relu_cutoff),
             torch.nn.MaxPool2d(pool_size),
             torch.nn.Flatten(),
-            torch.nn.Linear(flattened_size, feature_count),
+            Linear(flattened_size, feature_count),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

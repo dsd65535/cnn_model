@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 
+import git
 import torch
 
 from cnn_model.basic import get_device
@@ -126,6 +127,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--timed", action="store_true")
+    parser.add_argument("--print_git_info", action="store_true")
 
     return parser.parse_args()
 
@@ -134,6 +136,14 @@ def main() -> None:
     """Main Function"""
 
     args = parse_args()
+
+    if args.print_git_info:
+        repo = git.Repo(search_parent_directories=True)
+        print(f"Git SHA: {repo.head.object.hexsha}")
+        diff = repo.git.diff()
+        if diff:
+            print(repo.git.diff())
+        print()
 
     if args.timed:
         start = time.time()

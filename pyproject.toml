@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.8"
 torch = {version = "^2.1.0+cu118", source = "torch-cuda-11.8"}
 torchvision = {version = "^0.16.0+cu118", source = "torch-cuda-11.8"}
+gitpython = "^3.1.40"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.12.3"

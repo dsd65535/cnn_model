@@ -14,9 +14,9 @@ from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
 from cnn_model.common import MODELCACHEDIR
+from cnn_model.datasets import get_input_parameters
+from cnn_model.datasets import get_mnist
 from cnn_model.models import Ideal
-from cnn_model.scripts.ideal_mnist import get_input_parameters
-from cnn_model.scripts.ideal_mnist import get_mnist
 
 
 def run(

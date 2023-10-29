@@ -71,8 +71,8 @@ class Linear(torch.nn.Module):
         return out
 
 
-class Ideal(torch.nn.Module):
-    """An ideal version of the CNN architecture presented in:
+class Main(torch.nn.Module):
+    """A CNN architecture similar to the one presented in:
 
     Nikita Mirchandani. Ultra-Low Power and Robust Analog Computing
     Circuits and System Design Framework for Machine Learning Applications.

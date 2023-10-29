@@ -16,7 +16,7 @@ from cnn_model.basic import train_model
 from cnn_model.common import MODELCACHEDIR
 from cnn_model.datasets import get_dataset
 from cnn_model.datasets import get_input_parameters
-from cnn_model.models import Ideal
+from cnn_model.models import Main
 
 
 def run(
@@ -54,7 +54,7 @@ def run(
     full_results = {}
     for noise_train in noises_train:
         results = {}
-        model = Ideal(
+        model = Main(
             in_size=in_size,
             in_channels=in_channels,
             conv_out_channels=conv_out_channels,
@@ -71,7 +71,7 @@ def run(
         optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
         cache_filepath = Path(
-            f"{MODELCACHEDIR}/ideal_"
+            f"{MODELCACHEDIR}/"
             f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
             f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
             f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_noisy_{noise_train}.pth"

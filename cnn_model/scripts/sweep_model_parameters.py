@@ -7,7 +7,7 @@ from cnn_model.basic import test_model
 from cnn_model.basic import train_model
 from cnn_model.datasets import get_dataset
 from cnn_model.datasets import get_input_parameters
-from cnn_model.models import Ideal
+from cnn_model.models import Main
 
 
 def run(
@@ -29,7 +29,7 @@ def run(
     # pylint:disable=too-many-arguments,too-many-locals
     """Run a test"""
 
-    model = Ideal(
+    model = Main(
         in_size=in_size,
         in_channels=in_channels,
         conv_out_channels=conv_out_channels,

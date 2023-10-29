@@ -1,6 +1,6 @@
 """This script test the effects of quantization on accuracy"""
+from cnn_model.__main__ import train_and_test
 from cnn_model.basic import test_model
-from cnn_model.scripts.ideal import train_and_test_ideal
 
 
 def quantize(val: float, ref: float, bits: int) -> float:
@@ -32,7 +32,7 @@ def main(
     layer_0_params = "layers.0.bias" if bias else "layers.0.weight"
     layer_4_params = "layers.4.bias" if bias else "layers.4.weight"
 
-    model, loss_fn, test_dataloader, device = train_and_test_ideal(
+    model, loss_fn, test_dataloader, device = train_and_test(
         lr=lr,
         count_epoch=count_epoch,
         dataset_name=dataset_name,

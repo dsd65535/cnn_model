@@ -2,6 +2,7 @@
 import argparse
 import time
 from pathlib import Path
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -31,6 +32,7 @@ def train_and_test(
     relu_cutoff: float = 0.0,
     relu_out_noise: Optional[float] = None,
     linear_out_noise: Optional[float] = None,
+    additional_layers: Optional[List[int]] = None,
     print_rate: Optional[int] = None,
     use_cache: bool = True,
     retrain: bool = False,
@@ -63,6 +65,7 @@ def train_and_test(
         relu_cutoff=relu_cutoff,
         relu_out_noise=relu_out_noise,
         linear_out_noise=linear_out_noise,
+        additional_layers=additional_layers,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -70,8 +73,9 @@ def train_and_test(
     cache_filepath = Path(
         f"{MODELCACHEDIR}/"
         f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
-        f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}.pth"
+        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}_"
+        f"{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_"
+        f"{additional_layers}.pth"
     )
 
     if not use_cache or retrain or not cache_filepath.exists():

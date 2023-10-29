@@ -1,5 +1,6 @@
 """This module defines pyTorch modules and layers"""
 import math
+from typing import List
 from typing import Optional
 
 import torch
@@ -96,6 +97,7 @@ class Main(torch.nn.Module):
         relu_cutoff: float = 0.5,
         relu_out_noise: Optional[float] = None,
         linear_out_noise: Optional[float] = None,
+        additional_layers: Optional[List[int]] = None,
     ) -> None:
         # pylint:disable=too-many-arguments,too-many-locals
 
@@ -111,9 +113,7 @@ class Main(torch.nn.Module):
         if rem:
             raise ValueError("Invalid Pool Output Size")
 
-        flattened_size = pool_out_size**2 * conv_out_channels
-
-        self.layers = torch.nn.Sequential(
+        layers = [
             Normalize(min_out, max_out, min_in, max_in),
             torch.nn.Conv2d(
                 in_channels, conv_out_channels, kernel_size, stride, padding
@@ -121,8 +121,17 @@ class Main(torch.nn.Module):
             ReLU(relu_cutoff, relu_out_noise),
             torch.nn.MaxPool2d(pool_size),
             torch.nn.Flatten(),
-            Linear(flattened_size, feature_count, linear_out_noise),
-        )
+        ]
+
+        current_size = pool_out_size**2 * conv_out_channels
+        if additional_layers is not None:
+            for size in additional_layers:
+                layers.append(Linear(current_size, size))
+                layers.append(ReLU())
+                current_size = size
+        layers.append(Linear(current_size, feature_count, linear_out_noise))
+
+        self.layers = torch.nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Total forward computation"""

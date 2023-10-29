@@ -5,8 +5,7 @@ import torch
 from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
-from cnn_model.datasets import get_dataset
-from cnn_model.datasets import get_input_parameters
+from cnn_model.datasets import get_dataset_and_params
 from cnn_model.models import Main
 
 
@@ -73,12 +72,11 @@ def main(
 
     device = get_device()
 
-    train_dataloader, test_dataloader = get_dataset(
-        name=dataset_name, batch_size=batch_size
-    )
-    in_channels, in_size, feature_count = get_input_parameters(
-        train_dataloader, test_dataloader
-    )
+    (train_dataloader, test_dataloader), (
+        in_channels,
+        in_size,
+        feature_count,
+    ) = get_dataset_and_params(name=dataset_name, batch_size=batch_size)
 
     for conv_out_channels_exp in range(8):
         conv_out_channels = 2**conv_out_channels_exp

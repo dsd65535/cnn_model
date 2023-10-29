@@ -1,10 +1,13 @@
 """This module downloads and manipulates datasets"""
+from typing import Dict
 from typing import Tuple
 
 import torch
 import torchvision
 
 from cnn_model.common import DATACACHEDIR
+
+_CACHED_PARAMS: Dict[str, Tuple[int, int, int]] = {}
 
 
 def get_dataset(
@@ -80,3 +83,23 @@ def get_input_parameters(
         raise RuntimeError("Non-square input")
 
     return train_shape[0], train_shape[1], train_label_count
+
+
+def get_dataset_and_params(
+    name: str = "MNIST",
+    batch_size: int = 1,
+) -> Tuple[
+    Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader],
+    Tuple[int, int, int],
+]:
+    """Get a dataset and its (cached) parameters by name"""
+
+    dataset = get_dataset(name=name, batch_size=batch_size)
+
+    if name in _CACHED_PARAMS:
+        params = _CACHED_PARAMS[name]
+    else:
+        params = get_input_parameters(*dataset)
+        _CACHED_PARAMS[name] = params
+
+    return dataset, params

@@ -1,4 +1,4 @@
-"""This script trains and tests the Ideal model on the MNIST dataset"""
+"""This script trains and tests the Ideal model"""
 import argparse
 import time
 from pathlib import Path
@@ -12,15 +12,16 @@ from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
 from cnn_model.common import MODELCACHEDIR
+from cnn_model.datasets import get_dataset
 from cnn_model.datasets import get_input_parameters
-from cnn_model.datasets import get_mnist
 from cnn_model.models import Ideal
 
 
-def train_and_test_ideal_mnist(
+def train_and_test_ideal(
     *,
     lr: float = 1e-3,
     count_epoch: int = 5,
+    dataset_name: str = "MNIST",
     batch_size: int = 1,
     conv_out_channels: int = 32,
     kernel_size: int = 5,
@@ -35,7 +36,7 @@ def train_and_test_ideal_mnist(
     retrain: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
-    """Train and Test the Ideal model on MNIST
+    """Train and Test the Ideal model
 
     This function is based on:
     https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
@@ -43,7 +44,9 @@ def train_and_test_ideal_mnist(
 
     device = get_device()
 
-    train_dataloader, test_dataloader = get_mnist(batch_size=batch_size)
+    train_dataloader, test_dataloader = get_dataset(
+        name=dataset_name, batch_size=batch_size
+    )
     in_channels, in_size, feature_count = get_input_parameters(
         train_dataloader, test_dataloader
     )
@@ -65,8 +68,8 @@ def train_and_test_ideal_mnist(
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
     cache_filepath = Path(
-        f"{MODELCACHEDIR}/ideal_mnist_"
-        f"{lr}_{count_epoch}_{batch_size}_"
+        f"{MODELCACHEDIR}/ideal_"
+        f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
         f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
         f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}.pth"
     )
@@ -114,6 +117,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--count_epoch", type=int, default=5)
+    parser.add_argument("--dataset_name", type=str, default="MNIST")
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--conv_out_channels", type=int, default=32)
     parser.add_argument("--kernel_size", type=int, default=5)
@@ -148,9 +152,10 @@ def main() -> None:
     if args.timed:
         start = time.time()
 
-    train_and_test_ideal_mnist(
+    train_and_test_ideal(
         lr=args.lr,
         count_epoch=args.count_epoch,
+        dataset_name=args.dataset_name,
         batch_size=args.batch_size,
         conv_out_channels=args.conv_out_channels,
         kernel_size=args.kernel_size,

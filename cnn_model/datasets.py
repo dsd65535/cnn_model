@@ -7,27 +7,35 @@ import torchvision
 from cnn_model.common import DATACACHEDIR
 
 
-def get_mnist(
+def get_dataset(
+    name: str = "MNIST",
     batch_size: int = 1,
 ) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
-    """Get MNIST dataset"""
+    """Get a dataset by name"""
 
     DATACACHEDIR.mkdir(parents=True, exist_ok=True)
 
-    training_data = torchvision.datasets.MNIST(
-        root=DATACACHEDIR,
-        train=True,
-        download=True,
-        transform=torchvision.transforms.ToTensor(),
-    )
-    test_data = torchvision.datasets.MNIST(
-        root=DATACACHEDIR,
-        train=False,
-        download=True,
-        transform=torchvision.transforms.ToTensor(),
-    )
+    train_args = {
+        "root": DATACACHEDIR,
+        "train": True,
+        "download": True,
+        "transform": torchvision.transforms.ToTensor(),
+    }
 
-    train_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size)
+    test_args = {
+        "root": DATACACHEDIR,
+        "train": False,
+        "download": True,
+        "transform": torchvision.transforms.ToTensor(),
+    }
+
+    if name == "MNIST":
+        train_data = torchvision.datasets.MNIST(**train_args)
+        test_data = torchvision.datasets.MNIST(**test_args)
+    else:
+        raise ValueError(f"Unknown dataset {name}")
+
+    train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size)
     test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size)
 
     return train_dataloader, test_dataloader

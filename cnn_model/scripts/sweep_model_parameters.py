@@ -5,8 +5,8 @@ import torch
 from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
+from cnn_model.datasets import get_dataset
 from cnn_model.datasets import get_input_parameters
-from cnn_model.datasets import get_mnist
 from cnn_model.models import Ideal
 
 
@@ -60,6 +60,7 @@ def main(
     *,
     lr: float = 1e-3,
     count_epoch: int = 5,
+    dataset_name: str = "MNIST",
     batch_size: int = 1,
     conv_out_channels_def: int = 32,
     kernel_size_def: int = 5,
@@ -72,7 +73,9 @@ def main(
 
     device = get_device()
 
-    train_dataloader, test_dataloader = get_mnist(batch_size=batch_size)
+    train_dataloader, test_dataloader = get_dataset(
+        name=dataset_name, batch_size=batch_size
+    )
     in_channels, in_size, feature_count = get_input_parameters(
         train_dataloader, test_dataloader
     )

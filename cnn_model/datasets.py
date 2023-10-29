@@ -47,13 +47,13 @@ def get_dataset(
 def extract_shape(dataloader: torch.utils.data.DataLoader) -> Tuple[torch.Size, int]:
     """Extract the tensor shape and number of labels in a dataloader"""
 
-    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)
+    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)  # type:ignore
     if len(shape_set) < 1:
         raise RuntimeError("Empty Dataloader")
     if len(shape_set) > 1:
         raise RuntimeError("Inconsistent Dataloader")
 
-    label_set = set(label for _, label in dataloader.dataset)
+    label_set = set(label for _, label in dataloader.dataset)  # type:ignore
 
     return shape_set.pop(), len(label_set)
 

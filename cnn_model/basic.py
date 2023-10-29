@@ -31,7 +31,7 @@ def train_model(
     """Train a model on a dataloader"""
 
     if print_rate is not None:
-        total_size = len(dataloader.dataset)
+        total_size = len(dataloader.dataset)  # type:ignore
         print("              Last Loss")
 
     model.train()
@@ -90,4 +90,5 @@ def test_model(
                 (prediction.argmax(1) == correct_label).type(torch.float).sum().item()
             )
 
-    return total_loss / len(dataloader), total_correct / len(dataloader.dataset)
+    total_size = len(dataloader.dataset)  # type:ignore
+    return total_loss / len(dataloader), total_correct / total_size

@@ -32,6 +32,9 @@ def get_dataset(
     if name == "MNIST":
         train_data = torchvision.datasets.MNIST(**train_args)
         test_data = torchvision.datasets.MNIST(**test_args)
+    elif name == "CIFAR10":
+        train_data = torchvision.datasets.CIFAR10(**train_args)
+        test_data = torchvision.datasets.CIFAR10(**test_args)
     else:
         raise ValueError(f"Unknown dataset {name}")
 

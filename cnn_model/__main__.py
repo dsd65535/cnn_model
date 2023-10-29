@@ -33,6 +33,7 @@ def train_and_test(
     linear_out_noise: Optional[float] = None,
     additional_layers: Optional[List[int]] = None,
     print_rate: Optional[int] = None,
+    noise_train: Optional[float] = None,
     use_cache: bool = True,
     retrain: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
@@ -87,6 +88,7 @@ def train_and_test(
                 optimizer,
                 device=device,
                 print_rate=print_rate,
+                noise=noise_train,
             )
             if print_rate is not None and idx_epoch < count_epoch - 1:
                 avg_loss, accuracy = test_model(

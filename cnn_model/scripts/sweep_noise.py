@@ -8,14 +8,9 @@ from typing import List
 from typing import Optional
 
 import git
-import torch
 
-from cnn_model.basic import get_device
+from cnn_model.__main__ import train_and_test
 from cnn_model.basic import test_model
-from cnn_model.basic import train_model
-from cnn_model.common import MODELCACHEDIR
-from cnn_model.datasets import get_dataset_and_params
-from cnn_model.models import Main
 
 
 def run(
@@ -41,56 +36,27 @@ def run(
     # pylint:disable=too-many-arguments,too-many-locals
     """Run"""
 
-    device = get_device()
-
-    (train_dataloader, test_dataloader), (
-        in_channels,
-        in_size,
-        feature_count,
-    ) = get_dataset_and_params(name=dataset_name, batch_size=batch_size)
-
     full_results = {}
     for noise_train in noises_train:
         results = {}
-        model = Main(
-            in_size=in_size,
-            in_channels=in_channels,
+
+        model, loss_fn, test_dataloader, device = train_and_test(
+            lr=lr,
+            count_epoch=count_epoch,
+            dataset_name=dataset_name,
+            batch_size=batch_size,
             conv_out_channels=conv_out_channels,
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
             pool_size=pool_size,
-            feature_count=feature_count,
             relu_cutoff=relu_cutoff,
             relu_out_noise=relu_out_noise,
             linear_out_noise=linear_out_noise,
-        ).to(device)
-        loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-
-        cache_filepath = Path(
-            f"{MODELCACHEDIR}/"
-            f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-            f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
-            f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_noisy_{noise_train}.pth"
+            noise_train=noise_train,
+            use_cache=use_cache,
+            retrain=retrain,
         )
-
-        if not use_cache or retrain or not cache_filepath.exists():
-            for _ in range(count_epoch):
-                train_model(
-                    model,
-                    train_dataloader,
-                    loss_fn,
-                    optimizer,
-                    device=device,
-                    noise=noise_train,
-                )
-
-            if use_cache:
-                MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-                torch.save(model.state_dict(), cache_filepath)
-        else:
-            model.load_state_dict(torch.load(cache_filepath))
 
         for noise_test in noises_test:
             result = test_model(

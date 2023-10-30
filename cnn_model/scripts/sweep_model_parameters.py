@@ -1,4 +1,5 @@
 """This script sweeps the model parameters"""
+import logging
 from dataclasses import replace
 from typing import Optional
 
@@ -13,14 +14,18 @@ def run(
     dataset_name: str,
     train_params: Optional[TrainParams],
     model_params: ModelParams,
-) -> float:
+) -> Optional[float]:
     """Run a test"""
 
-    model, loss_fn, test_dataloader, device = train_and_test(
-        dataset_name=dataset_name,
-        train_params=train_params,
-        model_params=model_params,
-    )
+    try:
+        model, loss_fn, test_dataloader, device = train_and_test(
+            dataset_name=dataset_name,
+            train_params=train_params,
+            model_params=model_params,
+        )
+    except ValueError:
+        logging.exception("Training failed")
+        return None
 
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
 
@@ -45,7 +50,10 @@ def main(
             train_params=train_params,
             model_params=replace(model_params_def, conv_out_channels=conv_out_channels),
         )
-        print(f"conv_out_channels = {conv_out_channels}: {accuracy*100}%")
+        if accuracy is None:
+            print(f"conv_out_channels = {conv_out_channels}: N/A")
+        else:
+            print(f"conv_out_channels = {conv_out_channels}: {accuracy*100}%")
 
     for kernel_size in range(1, 8):
         accuracy = run(
@@ -53,7 +61,10 @@ def main(
             train_params=train_params,
             model_params=replace(model_params_def, kernel_size=kernel_size),
         )
-        print(f"kernel_size = {kernel_size}: {accuracy*100}%")
+        if accuracy is None:
+            print(f"kernel_size = {kernel_size}: N/A")
+        else:
+            print(f"kernel_size = {kernel_size}: {accuracy*100}%")
 
     for pool_size in range(1, 5):
         accuracy = run(
@@ -61,7 +72,10 @@ def main(
             train_params=train_params,
             model_params=replace(model_params_def, pool_size=pool_size),
         )
-        print(f"pool_size = {pool_size}: {accuracy*100}%")
+        if accuracy is None:
+            print(f"pool_size = {pool_size}: N/A")
+        else:
+            print(f"pool_size = {pool_size}: {accuracy*100}%")
 
 
 if __name__ == "__main__":

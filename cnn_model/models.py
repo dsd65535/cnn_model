@@ -1,13 +1,81 @@
 """This module defines pyTorch modules and layers"""
 import math
+from dataclasses import dataclass
+from dataclasses import field
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import torch
 
 
+@dataclass
+class FullModelParams:
+    # pylint:disable=too-many-instance-attributes  # dataclass
+    """Parameters for Main model"""
+
+    in_size: int
+    in_channels: int
+    conv_out_channels: int
+    kernel_size: int
+    stride: int
+    padding: int
+    pool_size: int
+    feature_count: int
+    additional_layers: Optional[List[int]]
+
+    conv_out_size: int = field(init=False)
+    pool_out_size: int = field(init=False)
+    final_size: int = field(init=False)
+    additional_layer_sizes: List[Tuple[int, int]] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.conv_out_size, rem = divmod(
+            self.in_size + self.stride + 2 * self.padding - self.kernel_size,
+            self.stride,
+        )
+        if rem:
+            raise ValueError("Invalid Convolution Output Size")
+
+        self.pool_out_size, rem = divmod(self.conv_out_size, self.pool_size)
+        if rem:
+            raise ValueError("Invalid Pool Output Size")
+
+        current_size = self.pool_out_size**2 * self.conv_out_channels
+        additional_layer_sizes = []
+        if self.additional_layers is not None:
+            for next_size in self.additional_layers:
+                additional_layer_sizes.append((current_size, next_size))
+                current_size = next_size
+
+        self.final_size = current_size
+        self.additional_layer_sizes = additional_layer_sizes
+
+
+@dataclass
+class Nonidealities:
+    """Nonidealities parameters for Main model"""
+
+    relu_cutoff: float = 0.0
+    relu_out_noise: Optional[float] = None
+    linear_out_noise: Optional[float] = None
+
+    def __str__(self) -> str:
+        return f"{self.relu_cutoff}_{self.relu_out_noise}_{self.linear_out_noise}"
+
+
+@dataclass
+class Normalization:
+    """Normalization parameters for Main model"""
+
+    min_out: float = 0.0
+    max_out: float = 1.0
+    min_in: float = 0.0
+    max_in: float = 1.0
+
+
 class Normalize(torch.nn.Module):
-    """Layer that convers to a realistic voltage"""
+    """Layer that converts to a realistic voltage"""
 
     def __init__(
         self, min_out: float, max_out: float, min_in: float = 0.0, max_in: float = 1.0
@@ -73,7 +141,7 @@ class Linear(torch.nn.Module):
 
 
 class Main(torch.nn.Module):
-    """A CNN architecture similar to the one presented in:
+    """A configurable CNN model similar to the one presented in:
 
     Nikita Mirchandani. Ultra-Low Power and Robust Analog Computing
     Circuits and System Design Framework for Machine Learning Applications.
@@ -81,55 +149,51 @@ class Main(torch.nn.Module):
 
     def __init__(
         self,
-        *,
-        min_out: float = 0.0,
-        max_out: float = 1.0,
-        min_in: float = 0.0,
-        max_in: float = 1.0,
-        in_size: int = 28,
-        in_channels: int = 1,
-        conv_out_channels: int = 32,
-        kernel_size: int = 5,
-        stride: int = 1,
-        padding: int = 0,
-        pool_size: int = 2,
-        feature_count: int = 10,
-        relu_cutoff: float = 0.5,
-        relu_out_noise: Optional[float] = None,
-        linear_out_noise: Optional[float] = None,
-        additional_layers: Optional[List[int]] = None,
+        full_model_params: FullModelParams,
+        nonidealities: Optional[Nonidealities] = None,
+        normalization: Optional[Normalization] = None,
     ) -> None:
-        # pylint:disable=too-many-arguments,too-many-locals
-
         super().__init__()
 
-        conv_out_size, rem = divmod(
-            in_size + stride + 2 * padding - kernel_size, stride
-        )
-        if rem:
-            raise ValueError("Invalid Convolution Output Size")
+        if nonidealities is None:
+            nonidealities = Nonidealities()
 
-        pool_out_size, rem = divmod(conv_out_size, pool_size)
-        if rem:
-            raise ValueError("Invalid Pool Output Size")
+        layers: List[torch.nn.Module] = []
 
-        layers = [
-            Normalize(min_out, max_out, min_in, max_in),
+        if normalization is not None:
+            layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
+            )
+
+        layers.append(
             torch.nn.Conv2d(
-                in_channels, conv_out_channels, kernel_size, stride, padding
-            ),
-            ReLU(relu_cutoff, relu_out_noise),
-            torch.nn.MaxPool2d(pool_size),
-            torch.nn.Flatten(),
-        ]
+                full_model_params.in_channels,
+                full_model_params.conv_out_channels,
+                full_model_params.kernel_size,
+                full_model_params.stride,
+                full_model_params.padding,
+            )
+        )
+        layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+        layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+        layers.append(torch.nn.Flatten())
 
-        current_size = pool_out_size**2 * conv_out_channels
-        if additional_layers is not None:
-            for size in additional_layers:
-                layers.append(Linear(current_size, size))
-                layers.append(ReLU())
-                current_size = size
-        layers.append(Linear(current_size, feature_count, linear_out_noise))
+        for in_size, out_size in full_model_params.additional_layer_sizes:
+            layers.append(Linear(in_size, out_size))
+            layers.append(ReLU())
+
+        layers.append(
+            Linear(
+                full_model_params.final_size,
+                full_model_params.feature_count,
+                nonidealities.linear_out_noise,
+            )
+        )
 
         self.layers = torch.nn.Sequential(*layers)
 

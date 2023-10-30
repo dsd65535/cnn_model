@@ -9,8 +9,10 @@ from typing import Optional
 
 import git
 
+from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
 from cnn_model.basic import test_model
+from cnn_model.models import Nonidealities
 
 
 def run(
@@ -41,18 +43,22 @@ def run(
         results = {}
 
         model, loss_fn, test_dataloader, device = train_and_test(
+            model_params=ModelParams(
+                conv_out_channels=conv_out_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding,
+                pool_size=pool_size,
+            ),
+            nonidealities=Nonidealities(
+                relu_cutoff=relu_cutoff,
+                relu_out_noise=relu_out_noise,
+                linear_out_noise=linear_out_noise,
+            ),
             lr=lr,
             count_epoch=count_epoch,
             dataset_name=dataset_name,
             batch_size=batch_size,
-            conv_out_channels=conv_out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            pool_size=pool_size,
-            relu_cutoff=relu_cutoff,
-            relu_out_noise=relu_out_noise,
-            linear_out_noise=linear_out_noise,
             noise_train=noise_train,
             use_cache=use_cache,
             retrain=retrain,

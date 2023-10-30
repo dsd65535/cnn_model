@@ -1,6 +1,7 @@
 """This script trains and tests the Main model"""
 import argparse
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 from typing import Optional
@@ -14,24 +15,56 @@ from cnn_model.basic import test_model
 from cnn_model.basic import train_model
 from cnn_model.common import MODELCACHEDIR
 from cnn_model.datasets import get_dataset_and_params
+from cnn_model.models import FullModelParams
 from cnn_model.models import Main
+from cnn_model.models import Nonidealities
+from cnn_model.models import Normalization
+
+
+@dataclass
+class ModelParams:
+    """Dataset-independent parameters for Main model"""
+
+    conv_out_channels: int = 32
+    kernel_size: int = 5
+    stride: int = 1
+    padding: int = 0
+    pool_size: int = 2
+    additional_layers: Optional[List[int]] = None
+
+    def get_full_model_params(
+        self, in_channels: int, in_size: int, feature_count: int
+    ) -> FullModelParams:
+        """Convert to FullModelParams"""
+
+        return FullModelParams(
+            in_size=in_size,
+            in_channels=in_channels,
+            conv_out_channels=self.conv_out_channels,
+            kernel_size=self.kernel_size,
+            stride=self.stride,
+            padding=self.padding,
+            pool_size=self.pool_size,
+            feature_count=feature_count,
+            additional_layers=self.additional_layers,
+        )
+
+    def __str__(self) -> str:
+        return (
+            f"{self.conv_out_channels}_{self.kernel_size}_{self.stride}_"
+            f"{self.padding}_{self.pool_size}_{self.additional_layers}"
+        )
 
 
 def train_and_test(
     *,
+    model_params: Optional[ModelParams] = None,
+    nonidealities: Optional[Nonidealities] = None,
+    normalization: Optional[Normalization] = None,
     lr: float = 1e-3,
     count_epoch: int = 5,
     dataset_name: str = "MNIST",
     batch_size: int = 1,
-    conv_out_channels: int = 32,
-    kernel_size: int = 5,
-    stride: int = 1,
-    padding: int = 0,
-    pool_size: int = 2,
-    relu_cutoff: float = 0.0,
-    relu_out_noise: Optional[float] = None,
-    linear_out_noise: Optional[float] = None,
-    additional_layers: Optional[List[int]] = None,
     print_rate: Optional[int] = None,
     noise_train: Optional[float] = None,
     use_cache: bool = True,
@@ -44,27 +77,19 @@ def train_and_test(
     https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
     """
 
+    if model_params is None:
+        model_params = ModelParams()
+
     device = get_device()
 
-    (train_dataloader, test_dataloader), (
-        in_channels,
-        in_size,
-        feature_count,
-    ) = get_dataset_and_params(name=dataset_name, batch_size=batch_size)
+    (train_dataloader, test_dataloader), dataset_params = get_dataset_and_params(
+        name=dataset_name, batch_size=batch_size
+    )
 
     model = Main(
-        in_size=in_size,
-        in_channels=in_channels,
-        conv_out_channels=conv_out_channels,
-        kernel_size=kernel_size,
-        stride=stride,
-        padding=padding,
-        pool_size=pool_size,
-        feature_count=feature_count,
-        relu_cutoff=relu_cutoff,
-        relu_out_noise=relu_out_noise,
-        linear_out_noise=linear_out_noise,
-        additional_layers=additional_layers,
+        model_params.get_full_model_params(*dataset_params),
+        nonidealities,
+        normalization,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -72,9 +97,7 @@ def train_and_test(
     cache_filepath = Path(
         f"{MODELCACHEDIR}/"
         f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}_"
-        f"{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_"
-        f"{additional_layers}.pth"
+        f"{model_params}_{nonidealities}.pth"
     )
 
     if not use_cache or retrain or not cache_filepath.exists():
@@ -157,18 +180,22 @@ def main() -> None:
         start = time.time()
 
     train_and_test(
+        model_params=ModelParams(
+            conv_out_channels=args.conv_out_channels,
+            kernel_size=args.kernel_size,
+            stride=args.stride,
+            padding=args.padding,
+            pool_size=args.pool_size,
+        ),
+        nonidealities=Nonidealities(
+            relu_cutoff=args.relu_cutoff,
+            relu_out_noise=args.relu_out_noise,
+            linear_out_noise=args.linear_out_noise,
+        ),
         lr=args.lr,
         count_epoch=args.count_epoch,
         dataset_name=args.dataset_name,
         batch_size=args.batch_size,
-        conv_out_channels=args.conv_out_channels,
-        kernel_size=args.kernel_size,
-        stride=args.stride,
-        padding=args.padding,
-        pool_size=args.pool_size,
-        relu_cutoff=args.relu_cutoff,
-        relu_out_noise=args.relu_out_noise,
-        linear_out_noise=args.linear_out_noise,
         print_rate=args.print_rate,
         use_cache=not args.no_cache,
         retrain=args.retrain,

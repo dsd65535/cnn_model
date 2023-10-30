@@ -1,4 +1,5 @@
 """This script test the effects of quantization on accuracy"""
+from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
 from cnn_model.basic import test_model
 
@@ -33,15 +34,17 @@ def main(
     layer_4_params = "layers.4.bias" if bias else "layers.4.weight"
 
     model, loss_fn, test_dataloader, device = train_and_test(
+        model_params=ModelParams(
+            conv_out_channels=conv_out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            pool_size=pool_size,
+        ),
         lr=lr,
         count_epoch=count_epoch,
         dataset_name=dataset_name,
         batch_size=batch_size,
-        conv_out_channels=conv_out_channels,
-        kernel_size=kernel_size,
-        stride=stride,
-        padding=padding,
-        pool_size=pool_size,
         retrain=retrain,
     )
 

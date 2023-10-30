@@ -20,15 +20,11 @@ def run(
     noises_test: List[Optional[float]],
     output_filepath: Path,
     *,
+    model_params: Optional[ModelParams] = None,
     lr: float = 1e-3,
     count_epoch: int = 5,
     dataset_name: str = "MNIST",
     batch_size: int = 1,
-    conv_out_channels: int = 32,
-    kernel_size: int = 5,
-    stride: int = 1,
-    padding: int = 0,
-    pool_size: int = 2,
     relu_cutoff: float = 0.0,
     relu_out_noise: Optional[float] = None,
     linear_out_noise: Optional[float] = None,
@@ -38,18 +34,15 @@ def run(
     # pylint:disable=too-many-arguments,too-many-locals
     """Run"""
 
+    if model_params is None:
+        model_params = ModelParams()
+
     full_results = {}
     for noise_train in noises_train:
         results = {}
 
         model, loss_fn, test_dataloader, device = train_and_test(
-            model_params=ModelParams(
-                conv_out_channels=conv_out_channels,
-                kernel_size=kernel_size,
-                stride=stride,
-                padding=padding,
-                pool_size=pool_size,
-            ),
+            model_params=model_params,
             nonidealities=Nonidealities(
                 relu_cutoff=relu_cutoff,
                 relu_out_noise=relu_out_noise,
@@ -126,15 +119,17 @@ def main() -> None:
         [None] + [2**exp for exp in range(-4, 4)],
         [None] + [2 ** (exp / 10) for exp in range(-40, 40)],
         args.output_filepath,
+        model_params=ModelParams(
+            conv_out_channels=args.conv_out_channels,
+            kernel_size=args.kernel_size,
+            stride=args.stride,
+            padding=args.padding,
+            pool_size=args.pool_size,
+        ),
         lr=args.lr,
         count_epoch=args.count_epoch,
         dataset_name=args.dataset_name,
         batch_size=args.batch_size,
-        conv_out_channels=args.conv_out_channels,
-        kernel_size=args.kernel_size,
-        stride=args.stride,
-        padding=args.padding,
-        pool_size=args.pool_size,
         relu_cutoff=args.relu_cutoff,
         relu_out_noise=args.relu_out_noise,
         linear_out_noise=args.linear_out_noise,

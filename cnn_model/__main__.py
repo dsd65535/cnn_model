@@ -22,6 +22,19 @@ from cnn_model.models import Normalization
 
 
 @dataclass
+class TrainParams:
+    """Parameters used during training"""
+
+    count_epoch: int = 5
+    batch_size: int = 1
+    lr: float = 1e-3
+    noise_train: Optional[float] = None
+
+    def __str__(self) -> str:
+        return f"{self.count_epoch}_{self.batch_size}_{self.lr}_{self.noise_train}"
+
+
+@dataclass
 class ModelParams:
     """Dataset-independent parameters for Main model"""
 
@@ -57,18 +70,14 @@ class ModelParams:
 
 
 def train_and_test(
-    *,
+    dataset_name: str = "MNIST",
+    train_params: Optional[TrainParams] = None,
     model_params: Optional[ModelParams] = None,
     nonidealities: Optional[Nonidealities] = None,
     normalization: Optional[Normalization] = None,
-    lr: float = 1e-3,
-    count_epoch: int = 5,
-    dataset_name: str = "MNIST",
-    batch_size: int = 1,
-    print_rate: Optional[int] = None,
-    noise_train: Optional[float] = None,
     use_cache: bool = True,
     retrain: bool = False,
+    print_rate: Optional[int] = None,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
     """Train and Test the Main model
@@ -79,11 +88,13 @@ def train_and_test(
 
     if model_params is None:
         model_params = ModelParams()
+    if train_params is None:
+        train_params = TrainParams()
 
     device = get_device()
 
     (train_dataloader, test_dataloader), dataset_params = get_dataset_and_params(
-        name=dataset_name, batch_size=batch_size
+        name=dataset_name, batch_size=train_params.batch_size
     )
 
     model = Main(
@@ -92,18 +103,16 @@ def train_and_test(
         normalization,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
 
     cache_filepath = Path(
-        f"{MODELCACHEDIR}/"
-        f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-        f"{model_params}_{nonidealities}.pth"
+        f"{MODELCACHEDIR}/{dataset_name}_{train_params}_{model_params}_{nonidealities}.pth"
     )
 
     if not use_cache or retrain or not cache_filepath.exists():
-        for idx_epoch in range(count_epoch):
+        for idx_epoch in range(train_params.count_epoch):
             if print_rate is not None:
-                print(f"Epoch {idx_epoch+1}/{count_epoch}:")
+                print(f"Epoch {idx_epoch+1}/{train_params.count_epoch}:")
             train_model(
                 model,
                 train_dataloader,
@@ -111,9 +120,9 @@ def train_and_test(
                 optimizer,
                 device=device,
                 print_rate=print_rate,
-                noise=noise_train,
+                noise=train_params.noise_train,
             )
-            if print_rate is not None and idx_epoch < count_epoch - 1:
+            if print_rate is not None and idx_epoch < train_params.count_epoch - 1:
                 avg_loss, accuracy = test_model(
                     model, test_dataloader, loss_fn, device=device
                 )
@@ -142,23 +151,29 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--dataset_name", type=str, default="MNIST")
+    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--noise_train", type=float, nargs="?")
     parser.add_argument("--conv_out_channels", type=int, default=32)
     parser.add_argument("--kernel_size", type=int, default=5)
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--padding", type=int, default=0)
     parser.add_argument("--pool_size", type=int, default=2)
+    parser.add_argument("--additional_layers", type=int, nargs="*")
     parser.add_argument("--relu_cutoff", type=float, default=0.0)
     parser.add_argument("--relu_out_noise", type=float, nargs="?")
     parser.add_argument("--linear_out_noise", type=float, nargs="?")
-    parser.add_argument("--print_rate", type=int, nargs="?")
+    parser.add_argument("--min_out", type=float, default=0.0)
+    parser.add_argument("--max_out", type=float, default=1.0)
+    parser.add_argument("--min_in", type=float, default=0.0)
+    parser.add_argument("--max_in", type=float, default=1.0)
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
-    parser.add_argument("--timed", action="store_true")
+    parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--print_git_info", action="store_true")
+    parser.add_argument("--timed", action="store_true")
 
     return parser.parse_args()
 
@@ -180,25 +195,35 @@ def main() -> None:
         start = time.time()
 
     train_and_test(
+        dataset_name=args.dataset_name,
+        train_params=TrainParams(
+            count_epoch=args.count_epoch,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            noise_train=args.noise_train,
+        ),
         model_params=ModelParams(
             conv_out_channels=args.conv_out_channels,
             kernel_size=args.kernel_size,
             stride=args.stride,
             padding=args.padding,
             pool_size=args.pool_size,
+            additional_layers=args.additional_layers,
         ),
         nonidealities=Nonidealities(
             relu_cutoff=args.relu_cutoff,
             relu_out_noise=args.relu_out_noise,
             linear_out_noise=args.linear_out_noise,
         ),
-        lr=args.lr,
-        count_epoch=args.count_epoch,
-        dataset_name=args.dataset_name,
-        batch_size=args.batch_size,
-        print_rate=args.print_rate,
+        normalization=Normalization(
+            min_out=args.min_out,
+            max_out=args.max_out,
+            min_in=args.min_in,
+            max_in=args.max_in,
+        ),
         use_cache=not args.no_cache,
         retrain=args.retrain,
+        print_rate=args.print_rate,
     )
 
     if args.timed:

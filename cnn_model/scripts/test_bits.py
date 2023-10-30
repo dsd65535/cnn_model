@@ -3,6 +3,7 @@ from typing import Optional
 
 from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
+from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
 
 
@@ -17,11 +18,9 @@ def quantize(val: float, ref: float, bits: int) -> float:
 def main(
     max_bits: int = 7,
     ref: float = 0.5,
-    model_params: Optional[ModelParams] = None,
-    lr: float = 1e-3,
-    count_epoch: int = 5,
     dataset_name: str = "MNIST",
-    batch_size: int = 1,
+    train_params: Optional[TrainParams] = None,
+    model_params: Optional[ModelParams] = None,
     bias: bool = False,
     retrain: bool = False,
 ) -> None:
@@ -35,11 +34,9 @@ def main(
         model_params = ModelParams()
 
     model, loss_fn, test_dataloader, device = train_and_test(
-        model_params=model_params,
-        lr=lr,
-        count_epoch=count_epoch,
         dataset_name=dataset_name,
-        batch_size=batch_size,
+        model_params=model_params,
+        train_params=train_params,
         retrain=retrain,
     )
 

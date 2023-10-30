@@ -1,8 +1,9 @@
-# pylint:disable=R0801
+# pylint:disable=duplicate-code
 """This script determines the effect of noise"""
 import argparse
 import json
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import List
 from typing import Optional
@@ -11,8 +12,10 @@ import git
 
 from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
+from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
 from cnn_model.models import Nonidealities
+from cnn_model.models import Normalization
 
 
 def run(
@@ -20,20 +23,20 @@ def run(
     noises_test: List[Optional[float]],
     output_filepath: Path,
     *,
-    model_params: Optional[ModelParams] = None,
-    lr: float = 1e-3,
-    count_epoch: int = 5,
     dataset_name: str = "MNIST",
-    batch_size: int = 1,
-    relu_cutoff: float = 0.0,
-    relu_out_noise: Optional[float] = None,
-    linear_out_noise: Optional[float] = None,
+    train_params: Optional[TrainParams] = None,
+    model_params: Optional[ModelParams] = None,
+    nonidealities: Optional[Nonidealities] = None,
+    normalization: Optional[Normalization] = None,
     use_cache: bool = True,
     retrain: bool = False,
+    print_rate: Optional[int] = None,
 ) -> None:
     # pylint:disable=too-many-arguments,too-many-locals
     """Run"""
 
+    if train_params is None:
+        train_params = TrainParams()
     if model_params is None:
         model_params = ModelParams()
 
@@ -42,19 +45,14 @@ def run(
         results = {}
 
         model, loss_fn, test_dataloader, device = train_and_test(
-            model_params=model_params,
-            nonidealities=Nonidealities(
-                relu_cutoff=relu_cutoff,
-                relu_out_noise=relu_out_noise,
-                linear_out_noise=linear_out_noise,
-            ),
-            lr=lr,
-            count_epoch=count_epoch,
             dataset_name=dataset_name,
-            batch_size=batch_size,
-            noise_train=noise_train,
+            train_params=replace(train_params, noise_train=noise_train),
+            model_params=model_params,
+            nonidealities=nonidealities,
+            normalization=normalization,
             use_cache=use_cache,
             retrain=retrain,
+            print_rate=print_rate,
         )
 
         for noise_test in noises_test:
@@ -93,8 +91,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--linear_out_noise", type=float, nargs="?")
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
-    parser.add_argument("--timed", action="store_true")
+    parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--print_git_info", action="store_true")
+    parser.add_argument("--timed", action="store_true")
 
     return parser.parse_args()
 
@@ -119,22 +118,35 @@ def main() -> None:
         [None] + [2**exp for exp in range(-4, 4)],
         [None] + [2 ** (exp / 10) for exp in range(-40, 40)],
         args.output_filepath,
+        dataset_name=args.dataset_name,
+        train_params=TrainParams(
+            count_epoch=args.count_epoch,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            noise_train=args.noise_train,
+        ),
         model_params=ModelParams(
             conv_out_channels=args.conv_out_channels,
             kernel_size=args.kernel_size,
             stride=args.stride,
             padding=args.padding,
             pool_size=args.pool_size,
+            additional_layers=args.additional_layers,
         ),
-        lr=args.lr,
-        count_epoch=args.count_epoch,
-        dataset_name=args.dataset_name,
-        batch_size=args.batch_size,
-        relu_cutoff=args.relu_cutoff,
-        relu_out_noise=args.relu_out_noise,
-        linear_out_noise=args.linear_out_noise,
+        nonidealities=Nonidealities(
+            relu_cutoff=args.relu_cutoff,
+            relu_out_noise=args.relu_out_noise,
+            linear_out_noise=args.linear_out_noise,
+        ),
+        normalization=Normalization(
+            min_out=args.min_out,
+            max_out=args.max_out,
+            min_in=args.min_in,
+            max_in=args.max_in,
+        ),
         use_cache=not args.no_cache,
         retrain=args.retrain,
+        print_rate=args.print_rate,
     )
 
     if args.timed:

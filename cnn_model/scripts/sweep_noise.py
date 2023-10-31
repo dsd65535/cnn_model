@@ -16,6 +16,7 @@ from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
+from cnn_model.parser import add_arguments_from_dataclass_fields
 
 
 def run(
@@ -76,19 +77,11 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument("output_filepath", type=Path)
-
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--dataset_name", type=str, default="MNIST")
-    parser.add_argument("--batch_size", type=int, default=1)
-    parser.add_argument("--conv_out_channels", type=int, default=32)
-    parser.add_argument("--kernel_size", type=int, default=5)
-    parser.add_argument("--stride", type=int, default=1)
-    parser.add_argument("--padding", type=int, default=0)
-    parser.add_argument("--pool_size", type=int, default=2)
-    parser.add_argument("--relu_cutoff", type=float, default=0.0)
-    parser.add_argument("--relu_out_noise", type=float, nargs="?")
-    parser.add_argument("--linear_out_noise", type=float, nargs="?")
+    add_arguments_from_dataclass_fields(TrainParams, parser)
+    add_arguments_from_dataclass_fields(ModelParams, parser)
+    add_arguments_from_dataclass_fields(Nonidealities, parser)
+    add_arguments_from_dataclass_fields(Normalization, parser)
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--print_rate", type=int, nargs="?")

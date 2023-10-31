@@ -73,7 +73,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    # pylint:disable=too-many-branches
+    # pylint:disable=too-many-branches,too-many-locals
     """Main Function"""
 
     args = parse_args()
@@ -163,6 +163,23 @@ def main() -> None:
             print(f"pool_size = {pool_size}: N/A")
         else:
             print(f"pool_size = {pool_size}: {accuracy*100}%")
+
+    for additional_layer_exp in range(5, 10):
+        additional_layers = [2**additional_layer_exp]
+        accuracy = run(
+            dataset_name=args.dataset_name,
+            train_params=train_params,
+            model_params=replace(model_params_def, additional_layers=additional_layers),
+            nonidealities=nonidealities,
+            normalization=normalization,
+            use_cache=not args.no_cache,
+            retrain=args.retrain,
+            print_rate=args.print_rate,
+        )
+        if accuracy is None:
+            print(f"additional_layers = {additional_layers}: N/A")
+        else:
+            print(f"additional_layers = {additional_layers}: {accuracy*100}%")
 
     if args.timed:
         end = time.time()

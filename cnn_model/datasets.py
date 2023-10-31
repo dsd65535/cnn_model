@@ -1,13 +1,13 @@
 """This module downloads and manipulates datasets"""
+from pathlib import Path
 from typing import Dict
 from typing import Tuple
 
 import torch
 import torchvision
 
-from cnn_model.common import DATACACHEDIR
-
 _CACHED_PARAMS: Dict[str, Tuple[int, int, int]] = {}
+DATACACHEDIR = Path("cache/data")
 
 
 def get_dataset(

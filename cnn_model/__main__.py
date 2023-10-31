@@ -13,13 +13,14 @@ import torch
 from cnn_model.basic import get_device
 from cnn_model.basic import test_model
 from cnn_model.basic import train_model
-from cnn_model.common import MODELCACHEDIR
 from cnn_model.datasets import get_dataset_and_params
 from cnn_model.models import FullModelParams
 from cnn_model.models import Main
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
 from cnn_model.parser import add_arguments_from_dataclass_fields
+
+MODELCACHEDIR = Path("cache/models")
 
 
 @dataclass

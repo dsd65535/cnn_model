@@ -3,7 +3,7 @@
 import argparse
 import logging
 import time
-from dataclasses import replace
+from typing import List
 from typing import Optional
 
 import git
@@ -15,6 +15,32 @@ from cnn_model.basic import test_model
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
 from cnn_model.parser import add_arguments_from_dataclass_fields
+
+
+def generate_model_params() -> List[ModelParams]:
+    # pylint:disable=too-many-nested-blocks
+    """Generate the set of ModelParams"""
+
+    model_params_list = []
+    for conv_out_channels_exp in range(8):
+        conv_out_channels = 2**conv_out_channels_exp
+        for kernel_size in range(1, 8):
+            for stride in range(1, 8):
+                for padding in range(kernel_size):
+                    for pool_size in range(1, 8):
+                        for additional_layers in [None]:
+                            model_params_list.append(
+                                ModelParams(
+                                    conv_out_channels,
+                                    kernel_size,
+                                    stride,
+                                    padding,
+                                    pool_size,
+                                    additional_layers,
+                                )
+                            )
+
+    return model_params_list
 
 
 def run(
@@ -60,7 +86,6 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--dataset_name", type=str, default="MNIST")
     add_arguments_from_dataclass_fields(TrainParams, parser)
-    add_arguments_from_dataclass_fields(ModelParams, parser)
     add_arguments_from_dataclass_fields(Nonidealities, parser)
     add_arguments_from_dataclass_fields(Normalization, parser)
     parser.add_argument("--no_cache", action="store_true")
@@ -73,7 +98,6 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    # pylint:disable=too-many-branches,too-many-locals
     """Main Function"""
 
     args = parse_args()
@@ -95,14 +119,6 @@ def main() -> None:
         lr=args.lr,
         noise_train=args.noise_train,
     )
-    model_params_def = ModelParams(
-        conv_out_channels=args.conv_out_channels,
-        kernel_size=args.kernel_size,
-        stride=args.stride,
-        padding=args.padding,
-        pool_size=args.pool_size,
-        additional_layers=args.additional_layers,
-    )
     nonidealities = Nonidealities(
         relu_cutoff=args.relu_cutoff,
         relu_out_noise=args.relu_out_noise,
@@ -115,71 +131,31 @@ def main() -> None:
         max_in=args.max_in,
     )
 
-    for conv_out_channels_exp in range(8):
-        conv_out_channels = 2**conv_out_channels_exp
+    model_params_list = generate_model_params()
+    print(
+        "conv_out_channels,kernel_size,stride,padding,pool_size,additional_layers,accuracy"
+    )
+    for model_params in model_params_list:
         accuracy = run(
             dataset_name=args.dataset_name,
             train_params=train_params,
-            model_params=replace(model_params_def, conv_out_channels=conv_out_channels),
+            model_params=model_params,
             nonidealities=nonidealities,
             normalization=normalization,
             use_cache=not args.no_cache,
             retrain=args.retrain,
             print_rate=args.print_rate,
         )
-        if accuracy is None:
-            print(f"conv_out_channels = {conv_out_channels}: N/A")
-        else:
-            print(f"conv_out_channels = {conv_out_channels}: {accuracy*100}%")
-
-    for kernel_size in range(1, 8):
-        accuracy = run(
-            dataset_name=args.dataset_name,
-            train_params=train_params,
-            model_params=replace(model_params_def, kernel_size=kernel_size),
-            nonidealities=nonidealities,
-            normalization=normalization,
-            use_cache=not args.no_cache,
-            retrain=args.retrain,
-            print_rate=args.print_rate,
+        accuracy_str = "N/A" if accuracy is None else f"{accuracy*100}%"
+        print(
+            f"{model_params.conv_out_channels},"
+            f"{model_params.kernel_size},"
+            f"{model_params.stride},"
+            f"{model_params.padding},"
+            f"{model_params.pool_size},"
+            f"{model_params.additional_layers},"
+            f"{accuracy_str}"
         )
-        if accuracy is None:
-            print(f"kernel_size = {kernel_size}: N/A")
-        else:
-            print(f"kernel_size = {kernel_size}: {accuracy*100}%")
-
-    for pool_size in range(1, 5):
-        accuracy = run(
-            dataset_name=args.dataset_name,
-            train_params=train_params,
-            model_params=replace(model_params_def, pool_size=pool_size),
-            nonidealities=nonidealities,
-            normalization=normalization,
-            use_cache=not args.no_cache,
-            retrain=args.retrain,
-            print_rate=args.print_rate,
-        )
-        if accuracy is None:
-            print(f"pool_size = {pool_size}: N/A")
-        else:
-            print(f"pool_size = {pool_size}: {accuracy*100}%")
-
-    for additional_layer_exp in range(5, 10):
-        additional_layers = [2**additional_layer_exp]
-        accuracy = run(
-            dataset_name=args.dataset_name,
-            train_params=train_params,
-            model_params=replace(model_params_def, additional_layers=additional_layers),
-            nonidealities=nonidealities,
-            normalization=normalization,
-            use_cache=not args.no_cache,
-            retrain=args.retrain,
-            print_rate=args.print_rate,
-        )
-        if accuracy is None:
-            print(f"additional_layers = {additional_layers}: N/A")
-        else:
-            print(f"additional_layers = {additional_layers}: {accuracy*100}%")
 
     if args.timed:
         end = time.time()

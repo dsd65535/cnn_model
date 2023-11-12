@@ -1,8 +1,11 @@
 # pylint:disable=duplicate-code
 """This script sweeps the model parameters"""
 import argparse
+import json
 import logging
 import time
+from pathlib import Path
+from typing import Dict
 from typing import List
 from typing import Optional
 
@@ -84,6 +87,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
+    parser.add_argument("database_filepath", type=Path, nargs="?")
     parser.add_argument("--dataset_name", type=str, default="MNIST")
     add_arguments_from_dataclass_fields(TrainParams, parser)
     add_arguments_from_dataclass_fields(Nonidealities, parser)
@@ -131,21 +135,41 @@ def main() -> None:
         max_in=args.max_in,
     )
 
+    if args.database_filepath is None:
+        database: Optional[Dict[str, Optional[float]]] = None
+    elif args.database_filepath.exists():
+        with args.database_filepath.open("r", encoding="UTF-8") as database_file:
+            database = json.load(database_file)
+    else:
+        database = {}
+
     model_params_list = generate_model_params()
     print(
         "conv_out_channels,kernel_size,stride,padding,pool_size,additional_layers,accuracy"
     )
     for model_params in model_params_list:
-        accuracy = run(
-            dataset_name=args.dataset_name,
-            train_params=train_params,
-            model_params=model_params,
-            nonidealities=nonidealities,
-            normalization=normalization,
-            use_cache=not args.no_cache,
-            retrain=args.retrain,
-            print_rate=args.print_rate,
-        )
+        if database is not None and str(model_params) in database:
+            accuracy = database[str(model_params)]
+        else:
+            accuracy = run(
+                dataset_name=args.dataset_name,
+                train_params=train_params,
+                model_params=model_params,
+                nonidealities=nonidealities,
+                normalization=normalization,
+                use_cache=not args.no_cache,
+                retrain=args.retrain,
+                print_rate=args.print_rate,
+            )
+            if database is not None:
+                database[str(model_params)] = accuracy
+                if args.database_filepath is None:
+                    raise RuntimeError
+                with args.database_filepath.open(
+                    "w", encoding="UTF-8"
+                ) as database_file:
+                    json.dump(database, database_file, indent=4)
+
         accuracy_str = "N/A" if accuracy is None else f"{accuracy*100}%"
         print(
             f"{model_params.conv_out_channels},"

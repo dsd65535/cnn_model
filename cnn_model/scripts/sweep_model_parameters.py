@@ -15,14 +15,17 @@ from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
 from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
+from cnn_model.datasets import get_dataset_and_params
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
 from cnn_model.parser import add_arguments_from_dataclass_fields
 
 
-def generate_model_params() -> List[ModelParams]:
+def generate_model_params(dataset_name: str) -> List[ModelParams]:
     # pylint:disable=too-many-nested-blocks
     """Generate the set of ModelParams"""
+
+    _, dataset_params = get_dataset_and_params(dataset_name)
 
     model_params_list = []
     for conv_out_channels_exp in range(8):
@@ -32,18 +35,33 @@ def generate_model_params() -> List[ModelParams]:
                 for padding in range(kernel_size):
                     for pool_size in range(1, 8):
                         for additional_layers in [None]:
-                            model_params_list.append(
-                                ModelParams(
-                                    conv_out_channels,
-                                    kernel_size,
-                                    stride,
-                                    padding,
-                                    pool_size,
-                                    additional_layers,
-                                )
+                            model_params = ModelParams(
+                                conv_out_channels,
+                                kernel_size,
+                                stride,
+                                padding,
+                                pool_size,
+                                additional_layers,
                             )
+                            try:
+                                full_model_params = model_params.get_full_model_params(
+                                    *dataset_params
+                                )
+                            except ValueError:
+                                continue
+                            weight = (
+                                full_model_params.conv_out_size**2
+                                * full_model_params.conv_out_channels
+                                * full_model_params.kernel_size**2
+                                + full_model_params.final_size
+                                * full_model_params.feature_count
+                            )
+                            model_params_list.append((weight, model_params))
 
-    return model_params_list
+    return [
+        model_params
+        for _, model_params in sorted(model_params_list, key=lambda x: x[0])
+    ]
 
 
 def run(
@@ -143,7 +161,8 @@ def main() -> None:
     else:
         database = {}
 
-    model_params_list = generate_model_params()
+    model_params_list = generate_model_params(args.dataset_name)
+
     print(
         "conv_out_channels,kernel_size,stride,padding,pool_size,additional_layers,accuracy"
     )

@@ -7,8 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "~3.11"
-torch = {version = "^2.1.0+cu118", source = "torch-cuda-11.8"}
-torchvision = {version = "^0.16.0+cu118", source = "torch-cuda-11.8"}
+torch = "^2.1.0"
+torchvision = "^0.16.0"
 gitpython = "^3.1.40"
 numpy = "^1.24"
 
@@ -18,12 +18,6 @@ reorder-python-imports = "^3.12.0"
 black = "^23.9.1"
 pylint = "^3.0.1"
 mypy = "^1.6.0"
-
-
-[[tool.poetry.source]]
-name = "torch-cuda-11.8"
-url = "https://download.pytorch.org/whl/cu118"
-priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]

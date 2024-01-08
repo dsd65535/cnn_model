@@ -1,10 +1,13 @@
 """This module downloads and manipulates datasets"""
+from pathlib import Path
+from typing import Dict
 from typing import Tuple
 
 import torch
 import torchvision
 
-from cnn_model.common import DATACACHEDIR
+_CACHED_PARAMS: Dict[str, Tuple[int, int, int]] = {}
+DATACACHEDIR = Path("cache/data")
 
 
 def get_dataset(
@@ -47,13 +50,13 @@ def get_dataset(
 def extract_shape(dataloader: torch.utils.data.DataLoader) -> Tuple[torch.Size, int]:
     """Extract the tensor shape and number of labels in a dataloader"""
 
-    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)
+    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)  # type:ignore
     if len(shape_set) < 1:
         raise RuntimeError("Empty Dataloader")
     if len(shape_set) > 1:
         raise RuntimeError("Inconsistent Dataloader")
 
-    label_set = set(label for _, label in dataloader.dataset)
+    label_set = set(label for _, label in dataloader.dataset)  # type:ignore
 
     return shape_set.pop(), len(label_set)
 
@@ -80,3 +83,23 @@ def get_input_parameters(
         raise RuntimeError("Non-square input")
 
     return train_shape[0], train_shape[1], train_label_count
+
+
+def get_dataset_and_params(
+    name: str = "MNIST",
+    batch_size: int = 1,
+) -> Tuple[
+    Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader],
+    Tuple[int, int, int],
+]:
+    """Get a dataset and its (cached) parameters by name"""
+
+    dataset = get_dataset(name=name, batch_size=batch_size)
+
+    if name in _CACHED_PARAMS:
+        params = _CACHED_PARAMS[name]
+    else:
+        params = get_input_parameters(*dataset)
+        _CACHED_PARAMS[name] = params
+
+    return dataset, params

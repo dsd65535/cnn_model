@@ -1,22 +1,22 @@
-# pylint:disable=R0801
+# pylint:disable=duplicate-code
 """This script determines the effect of noise"""
 import argparse
 import json
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import List
 from typing import Optional
 
 import git
-import torch
 
-from cnn_model.basic import get_device
+from cnn_model.__main__ import ModelParams
+from cnn_model.__main__ import train_and_test
+from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
-from cnn_model.basic import train_model
-from cnn_model.common import MODELCACHEDIR
-from cnn_model.datasets import get_dataset
-from cnn_model.datasets import get_input_parameters
-from cnn_model.models import Main
+from cnn_model.models import Nonidealities
+from cnn_model.models import Normalization
+from cnn_model.parser import add_arguments_from_dataclass_fields
 
 
 def run(
@@ -24,75 +24,37 @@ def run(
     noises_test: List[Optional[float]],
     output_filepath: Path,
     *,
-    lr: float = 1e-3,
-    count_epoch: int = 5,
     dataset_name: str = "MNIST",
-    batch_size: int = 1,
-    conv_out_channels: int = 32,
-    kernel_size: int = 5,
-    stride: int = 1,
-    padding: int = 0,
-    pool_size: int = 2,
-    relu_cutoff: float = 0.0,
-    relu_out_noise: Optional[float] = None,
-    linear_out_noise: Optional[float] = None,
+    train_params: Optional[TrainParams] = None,
+    model_params: Optional[ModelParams] = None,
+    nonidealities: Optional[Nonidealities] = None,
+    normalization: Optional[Normalization] = None,
     use_cache: bool = True,
     retrain: bool = False,
+    print_rate: Optional[int] = None,
 ) -> None:
     # pylint:disable=too-many-arguments,too-many-locals
     """Run"""
 
-    device = get_device()
-
-    train_dataloader, test_dataloader = get_dataset(
-        name=dataset_name, batch_size=batch_size
-    )
-    in_channels, in_size, feature_count = get_input_parameters(
-        train_dataloader, test_dataloader
-    )
+    if train_params is None:
+        train_params = TrainParams()
+    if model_params is None:
+        model_params = ModelParams()
 
     full_results = {}
     for noise_train in noises_train:
         results = {}
-        model = Main(
-            in_size=in_size,
-            in_channels=in_channels,
-            conv_out_channels=conv_out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            pool_size=pool_size,
-            feature_count=feature_count,
-            relu_cutoff=relu_cutoff,
-            relu_out_noise=relu_out_noise,
-            linear_out_noise=linear_out_noise,
-        ).to(device)
-        loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
-        cache_filepath = Path(
-            f"{MODELCACHEDIR}/"
-            f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-            f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
-            f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_noisy_{noise_train}.pth"
+        model, loss_fn, test_dataloader, device = train_and_test(
+            dataset_name=dataset_name,
+            train_params=replace(train_params, noise_train=noise_train),
+            model_params=model_params,
+            nonidealities=nonidealities,
+            normalization=normalization,
+            use_cache=use_cache,
+            retrain=retrain,
+            print_rate=print_rate,
         )
-
-        if not use_cache or retrain or not cache_filepath.exists():
-            for _ in range(count_epoch):
-                train_model(
-                    model,
-                    train_dataloader,
-                    loss_fn,
-                    optimizer,
-                    device=device,
-                    noise=noise_train,
-                )
-
-            if use_cache:
-                MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-                torch.save(model.state_dict(), cache_filepath)
-        else:
-            model.load_state_dict(torch.load(cache_filepath))
 
         for noise_test in noises_test:
             result = test_model(
@@ -115,23 +77,16 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument("output_filepath", type=Path)
-
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--dataset_name", type=str, default="MNIST")
-    parser.add_argument("--batch_size", type=int, default=1)
-    parser.add_argument("--conv_out_channels", type=int, default=32)
-    parser.add_argument("--kernel_size", type=int, default=5)
-    parser.add_argument("--stride", type=int, default=1)
-    parser.add_argument("--padding", type=int, default=0)
-    parser.add_argument("--pool_size", type=int, default=2)
-    parser.add_argument("--relu_cutoff", type=float, default=0.0)
-    parser.add_argument("--relu_out_noise", type=float, nargs="?")
-    parser.add_argument("--linear_out_noise", type=float, nargs="?")
+    add_arguments_from_dataclass_fields(TrainParams, parser)
+    add_arguments_from_dataclass_fields(ModelParams, parser)
+    add_arguments_from_dataclass_fields(Nonidealities, parser)
+    add_arguments_from_dataclass_fields(Normalization, parser)
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
-    parser.add_argument("--timed", action="store_true")
+    parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--print_git_info", action="store_true")
+    parser.add_argument("--timed", action="store_true")
 
     return parser.parse_args()
 
@@ -156,20 +111,35 @@ def main() -> None:
         [None] + [2**exp for exp in range(-4, 4)],
         [None] + [2 ** (exp / 10) for exp in range(-40, 40)],
         args.output_filepath,
-        lr=args.lr,
-        count_epoch=args.count_epoch,
         dataset_name=args.dataset_name,
-        batch_size=args.batch_size,
-        conv_out_channels=args.conv_out_channels,
-        kernel_size=args.kernel_size,
-        stride=args.stride,
-        padding=args.padding,
-        pool_size=args.pool_size,
-        relu_cutoff=args.relu_cutoff,
-        relu_out_noise=args.relu_out_noise,
-        linear_out_noise=args.linear_out_noise,
+        train_params=TrainParams(
+            count_epoch=args.count_epoch,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            noise_train=args.noise_train,
+        ),
+        model_params=ModelParams(
+            conv_out_channels=args.conv_out_channels,
+            kernel_size=args.kernel_size,
+            stride=args.stride,
+            padding=args.padding,
+            pool_size=args.pool_size,
+            additional_layers=args.additional_layers,
+        ),
+        nonidealities=Nonidealities(
+            relu_cutoff=args.relu_cutoff,
+            relu_out_noise=args.relu_out_noise,
+            linear_out_noise=args.linear_out_noise,
+        ),
+        normalization=Normalization(
+            min_out=args.min_out,
+            max_out=args.max_out,
+            min_in=args.min_in,
+            max_in=args.max_in,
+        ),
         use_cache=not args.no_cache,
         retrain=args.retrain,
+        print_rate=args.print_rate,
     )
 
     if args.timed:

@@ -1,10 +1,11 @@
-"""This script trains and tests the Main model"""
+# pylint:disable=R0801
+"""This script determines the effect of noise"""
 import argparse
+import json
 import time
 from pathlib import Path
 from typing import List
 from typing import Optional
-from typing import Tuple
 
 import git
 import torch
@@ -18,7 +19,10 @@ from cnn_model.datasets import get_input_parameters
 from cnn_model.models import Main
 
 
-def train_and_test(
+def run(
+    noises_train: List[Optional[float]],
+    noises_test: List[Optional[float]],
+    output_filepath: Path,
     *,
     lr: float = 1e-3,
     count_epoch: int = 5,
@@ -32,17 +36,11 @@ def train_and_test(
     relu_cutoff: float = 0.0,
     relu_out_noise: Optional[float] = None,
     linear_out_noise: Optional[float] = None,
-    additional_layers: Optional[List[int]] = None,
-    print_rate: Optional[int] = None,
     use_cache: bool = True,
     retrain: bool = False,
-) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
+) -> None:
     # pylint:disable=too-many-arguments,too-many-locals
-    """Train and Test the Main model
-
-    This function is based on:
-    https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
-    """
+    """Run"""
 
     device = get_device()
 
@@ -53,63 +51,60 @@ def train_and_test(
         train_dataloader, test_dataloader
     )
 
-    model = Main(
-        in_size=in_size,
-        in_channels=in_channels,
-        conv_out_channels=conv_out_channels,
-        kernel_size=kernel_size,
-        stride=stride,
-        padding=padding,
-        pool_size=pool_size,
-        feature_count=feature_count,
-        relu_cutoff=relu_cutoff,
-        relu_out_noise=relu_out_noise,
-        linear_out_noise=linear_out_noise,
-        additional_layers=additional_layers,
-    ).to(device)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    full_results = {}
+    for noise_train in noises_train:
+        results = {}
+        model = Main(
+            in_size=in_size,
+            in_channels=in_channels,
+            conv_out_channels=conv_out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            pool_size=pool_size,
+            feature_count=feature_count,
+            relu_cutoff=relu_cutoff,
+            relu_out_noise=relu_out_noise,
+            linear_out_noise=linear_out_noise,
+        ).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
-    cache_filepath = Path(
-        f"{MODELCACHEDIR}/"
-        f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
-        f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}_"
-        f"{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_"
-        f"{additional_layers}.pth"
-    )
+        cache_filepath = Path(
+            f"{MODELCACHEDIR}/"
+            f"{lr}_{count_epoch}_{dataset_name}_{batch_size}_"
+            f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}"
+            f"_{relu_cutoff}_{relu_out_noise}_{linear_out_noise}_noisy_{noise_train}.pth"
+        )
 
-    if not use_cache or retrain or not cache_filepath.exists():
-        for idx_epoch in range(count_epoch):
-            if print_rate is not None:
-                print(f"Epoch {idx_epoch+1}/{count_epoch}:")
-            train_model(
-                model,
-                train_dataloader,
-                loss_fn,
-                optimizer,
-                device=device,
-                print_rate=print_rate,
-            )
-            if print_rate is not None and idx_epoch < count_epoch - 1:
-                avg_loss, accuracy = test_model(
-                    model, test_dataloader, loss_fn, device=device
+        if not use_cache or retrain or not cache_filepath.exists():
+            for _ in range(count_epoch):
+                train_model(
+                    model,
+                    train_dataloader,
+                    loss_fn,
+                    optimizer,
+                    device=device,
+                    noise=noise_train,
                 )
-                print(f"Average Loss:  {avg_loss:<9f}")
-                print(f"Accuracy:      {(100*accuracy):<0.4f}%")
-                print()
 
-        if use_cache:
-            MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-            torch.save(model.state_dict(), cache_filepath)
-    else:
-        model.load_state_dict(torch.load(cache_filepath))
+            if use_cache:
+                MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+                torch.save(model.state_dict(), cache_filepath)
+        else:
+            model.load_state_dict(torch.load(cache_filepath))
 
-    if print_rate is not None:
-        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        print(f"Average Loss:  {avg_loss:<9f}")
-        print(f"Accuracy:      {(100*accuracy):<0.4f}%")
+        for noise_test in noises_test:
+            result = test_model(
+                model, test_dataloader, loss_fn, device=device, noise=noise_test
+            )
+            print(f"{noise_train} {noise_test} {result}")
+            results[noise_test] = result
 
-    return model, loss_fn, test_dataloader, device
+        full_results[noise_train] = results
+
+    with output_filepath.open("w") as output_file:
+        json.dump(full_results, output_file, indent=4)
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +113,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+
+    parser.add_argument("output_filepath", type=Path)
 
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--count_epoch", type=int, default=5)
@@ -131,7 +128,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--relu_cutoff", type=float, default=0.0)
     parser.add_argument("--relu_out_noise", type=float, nargs="?")
     parser.add_argument("--linear_out_noise", type=float, nargs="?")
-    parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--timed", action="store_true")
@@ -156,7 +152,10 @@ def main() -> None:
     if args.timed:
         start = time.time()
 
-    train_and_test(
+    run(
+        [None] + [2**exp for exp in range(-4, 4)],
+        [None] + [2 ** (exp / 10) for exp in range(-40, 40)],
+        args.output_filepath,
         lr=args.lr,
         count_epoch=args.count_epoch,
         dataset_name=args.dataset_name,
@@ -169,7 +168,6 @@ def main() -> None:
         relu_cutoff=args.relu_cutoff,
         relu_out_noise=args.relu_out_noise,
         linear_out_noise=args.linear_out_noise,
-        print_rate=args.print_rate,
         use_cache=not args.no_cache,
         retrain=args.retrain,
     )

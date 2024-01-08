@@ -17,20 +17,6 @@ def get_device() -> str:
     return "cpu"
 
 
-def extract_shape(dataloader: torch.utils.data.DataLoader) -> Tuple[torch.Size, int]:
-    """Extract the tensor shape and number of labels in a dataloader"""
-
-    shape_set = set(tensor.shape for tensor, _ in dataloader.dataset)
-    if len(shape_set) < 1:
-        raise RuntimeError("Empty Dataloader")
-    if len(shape_set) > 1:
-        raise RuntimeError("Inconsistent Dataloader")
-
-    label_set = set(label for _, label in dataloader.dataset)
-
-    return shape_set.pop(), len(label_set)
-
-
 def train_model(
     model: torch.nn.Module,
     dataloader: torch.utils.data.DataLoader,
@@ -39,6 +25,7 @@ def train_model(
     *,
     device: str = "cpu",
     print_rate: Optional[int] = None,
+    noise: Optional[float] = None,
 ) -> None:
     # pylint:disable=too-many-arguments
     """Train a model on a dataloader"""
@@ -52,6 +39,11 @@ def train_model(
     for idx_batch, (tensor_in, correct_label) in enumerate(dataloader):
         tensor_in = tensor_in.to(device)
         correct_label = correct_label.to(device)
+
+        if noise is not None:
+            tensor_in = torch.add(
+                tensor_in, noise * torch.randn(tensor_in.shape).to(device)
+            )
 
         prediction = model(tensor_in)
         loss = loss_fn(prediction, correct_label)
@@ -72,6 +64,7 @@ def test_model(
     loss_fn: torch.nn.Module,
     *,
     device: str = "cpu",
+    noise: Optional[float] = None,
 ) -> Tuple[float, float]:
     """Test a model on a dataloader"""
 
@@ -83,6 +76,11 @@ def test_model(
         for tensor_in, correct_label in dataloader:
             tensor_in = tensor_in.to(device)
             correct_label = correct_label.to(device)
+
+            if noise is not None:
+                tensor_in = torch.add(
+                    tensor_in, noise * torch.randn(tensor_in.shape).to(device)
+                )
 
             prediction = model(tensor_in)
             loss = loss_fn(prediction, correct_label)

@@ -1,4 +1,6 @@
 """This script trains and tests the Ideal model on the MNIST dataset"""
+import argparse
+import time
 from pathlib import Path
 from typing import Optional
 from typing import Tuple
@@ -76,6 +78,7 @@ def train_and_test_ideal_mnist(
     padding: int = 0,
     pool_size: int = 2,
     print_rate: Optional[int] = None,
+    use_cache: bool = True,
     retrain: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
@@ -111,7 +114,7 @@ def train_and_test_ideal_mnist(
         f"{conv_out_channels}_{kernel_size}_{stride}_{padding}_{pool_size}.pth"
     )
 
-    if retrain or not cache_filepath.exists():
+    if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(count_epoch):
             if print_rate is not None:
                 print(f"Epoch {idx_epoch+1}/{count_epoch}:")
@@ -131,8 +134,9 @@ def train_and_test_ideal_mnist(
                 print(f"Accuracy:      {(100*accuracy):<0.4f}%")
                 print()
 
-        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-        torch.save(model.state_dict(), cache_filepath)
+        if use_cache:
+            MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), cache_filepath)
     else:
         model.load_state_dict(torch.load(cache_filepath))
 
@@ -144,10 +148,54 @@ def train_and_test_ideal_mnist(
     return model, loss_fn, test_dataloader, device
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse CLI Arguments"""
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--count_epoch", type=int, default=5)
+    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--conv_out_channels", type=int, default=32)
+    parser.add_argument("--kernel_size", type=int, default=5)
+    parser.add_argument("--stride", type=int, default=1)
+    parser.add_argument("--padding", type=int, default=0)
+    parser.add_argument("--pool_size", type=int, default=2)
+    parser.add_argument("--print_rate", type=int, nargs="?")
+    parser.add_argument("--no_cache", action="store_true")
+    parser.add_argument("--retrain", action="store_true")
+    parser.add_argument("--timed", action="store_true")
+
+    return parser.parse_args()
+
+
 def main() -> None:
     """Main Function"""
 
-    train_and_test_ideal_mnist(print_rate=1000)
+    args = parse_args()
+
+    if args.timed:
+        start = time.time()
+
+    train_and_test_ideal_mnist(
+        lr=args.lr,
+        count_epoch=args.count_epoch,
+        batch_size=args.batch_size,
+        conv_out_channels=args.conv_out_channels,
+        kernel_size=args.kernel_size,
+        stride=args.stride,
+        padding=args.padding,
+        pool_size=args.pool_size,
+        print_rate=args.print_rate,
+        use_cache=not args.no_cache,
+        retrain=args.retrain,
+    )
+
+    if args.timed:
+        end = time.time()
+        print(f"{start} : {end} ({end - start})")
 
 
 if __name__ == "__main__":

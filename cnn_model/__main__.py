@@ -27,7 +27,7 @@ MODELCACHEDIR = Path("cache/models")
 class TrainParams:
     """Parameters used during training"""
 
-    count_epoch: int = 5
+    count_epoch: int = 10
     batch_size: int = 1
     lr: float = 1e-3
     noise_train: Optional[float] = None
@@ -77,7 +77,7 @@ def train_and_test(
     model_params: Optional[ModelParams] = None,
     nonidealities: Optional[Nonidealities] = None,
     normalization: Optional[Normalization] = None,
-    use_cache: bool = True,
+    use_cache: bool = False,
     retrain: bool = False,
     print_rate: Optional[int] = None,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:

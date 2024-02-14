@@ -169,8 +169,7 @@ class Main(torch.nn.Module):
                     normalization.max_in,
                 )
             )
-
-        layers.append(
+            layers.append(
             torch.nn.Conv2d(
                 full_model_params.in_channels,
                 full_model_params.conv_out_channels,
@@ -179,10 +178,14 @@ class Main(torch.nn.Module):
                 full_model_params.padding,
             )
         )
+
         layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+        
+        
         layers.append(torch.nn.Flatten())
-
+# add more layers
+        # softmax, drop out, dense layers
         for in_size, out_size in full_model_params.additional_layer_sizes:
             layers.append(Linear(in_size, out_size))
             layers.append(ReLU())

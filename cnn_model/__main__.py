@@ -27,7 +27,7 @@ MODELCACHEDIR = Path("cache/models")
 class TrainParams:
     """Parameters used during training"""
 
-    count_epoch: int = 10
+    count_epoch: int = 5
     batch_size: int = 1
     lr: float = 1e-3
     noise_train: Optional[float] = None

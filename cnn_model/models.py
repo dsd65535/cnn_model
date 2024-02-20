@@ -178,37 +178,69 @@ class Main(torch.nn.Module):
                 full_model_params.padding,
             )
         )
+            layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+            layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
+            )
+            layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+
             layers.append(
             torch.nn.Conv2d(
             in_channels=32, 
             out_channels=64, 
             kernel_size=(3,3), 
             padding=(1,1)))
-
-        layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
-        layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+            layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+            layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
+            )
+            layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+        
         layers.append(
             torch.nn.Conv2d(
             in_channels=64, 
             out_channels=96, 
             kernel_size=(3,3), 
             padding=(1,1)))
+        layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+        layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
+            )
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
 
         layers.append(torch.nn.Flatten())
-        # softmax, drop out, dense layers
+        layers.append(torch.nn.Dropout(p=0.6))
+
+        # softmax,
         for in_size, out_size in full_model_params.additional_layer_sizes:
             layers.append(Linear(in_size, out_size))
+            layers.append(torch.nn.Dropout(p=0.5))
             layers.append(ReLU())
-
+        
         layers.append(
             Linear(
-                4704,
+                864,
                 full_model_params.feature_count,
                 nonidealities.linear_out_noise,
             )
         )
-
+# fully connected layer output size: n_out = (n_in+2p-k)/s + 1
+        # p = padding size, k = kernal size, s = stride
         self.layers = torch.nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -237,7 +237,7 @@ class Main(torch.nn.Module):
                     normalization.max_in,
                 ))
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
-        layers.append(torch.nn.Dropout(p=0.5))
+       # layers.append(torch.nn.Dropout(p=0.5))
 
         layers.append(torch.nn.Flatten())
         for in_size, out_size in full_model_params.additional_layer_sizes:

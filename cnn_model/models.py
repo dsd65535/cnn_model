@@ -51,6 +51,35 @@ class FullModelParams:
         self.final_size = current_size
         self.additional_layer_sizes = additional_layer_sizes
 
+    @property
+    def mac_counts(self) -> List[int]:
+        """Number of MAC structures in each layer"""
+
+        return (
+            []
+            if self.additional_layer_sizes is None
+            else [in_size for in_size, _ in self.additional_layer_sizes]
+            + [self.final_size, self.feature_count]
+        )
+
+    @property
+    def mac_count(self) -> int:
+        """Total number of MAC structures"""
+
+        return sum(self.mac_counts)
+
+    @property
+    def multiplier_count(self) -> int:
+        """Number of Multipliers"""
+
+        current_size = self.kernel_size**2
+        multiplier_count = 0
+        for mac_count in self.mac_counts:
+            multiplier_count += current_size * mac_count
+            current_size = mac_count
+
+        return multiplier_count
+
 
 @dataclass
 class Nonidealities:

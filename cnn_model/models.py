@@ -103,6 +103,20 @@ class Normalization:
     max_in: float = 1.0
 
 
+class Recorder(torch.nn.Module):
+    """Layer that records values"""
+
+    def __init__(self, store: List[torch.Tensor]) -> None:
+        super().__init__()
+        self.store = store
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward function"""
+
+        self.store.append(x)
+        return x
+
+
 class Normalize(torch.nn.Module):
     """Layer that converts to a realistic voltage"""
 
@@ -181,11 +195,15 @@ class Main(torch.nn.Module):
         full_model_params: FullModelParams,
         nonidealities: Optional[Nonidealities] = None,
         normalization: Optional[Normalization] = None,
+        record: bool = False,
     ) -> None:
         super().__init__()
 
         if nonidealities is None:
             nonidealities = Nonidealities()
+
+        if record:
+            self.store: List[List[torch.Tensor]] = []
 
         layers: List[torch.nn.Module] = []
 
@@ -208,12 +226,18 @@ class Main(torch.nn.Module):
                 full_model_params.padding,
             )
         )
+        if record:
+            self.store.append([])
+            layers.append(Recorder(self.store[-1]))
         layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
         layers.append(torch.nn.Flatten())
 
         for in_size, out_size in full_model_params.additional_layer_sizes:
             layers.append(Linear(in_size, out_size))
+            if record:
+                self.store.append([])
+                layers.append(Recorder(self.store[-1]))
             layers.append(ReLU())
 
         layers.append(

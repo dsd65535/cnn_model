@@ -80,6 +80,7 @@ def train_and_test(
     use_cache: bool = True,
     retrain: bool = False,
     print_rate: Optional[int] = None,
+    record: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
     """Train and Test the Main model
@@ -103,6 +104,7 @@ def train_and_test(
         model_params.get_full_model_params(*dataset_params),
         nonidealities,
         normalization,
+        record,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
@@ -136,7 +138,11 @@ def train_and_test(
             MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), cache_filepath)
     else:
-        model.load_state_dict(torch.load(cache_filepath))
+        state_dict = torch.load(cache_filepath)
+        if record:
+            state_dict["layers.6.weight"] = state_dict.pop("layers.5.weight")
+            state_dict["layers.6.bias"] = state_dict.pop("layers.5.bias")
+        model.load_state_dict(state_dict)
 
     if print_rate is not None:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
@@ -213,6 +219,7 @@ def main() -> None:
         use_cache=not args.no_cache,
         retrain=args.retrain,
         print_rate=args.print_rate,
+        record=True,
     )
 
     if args.timed:

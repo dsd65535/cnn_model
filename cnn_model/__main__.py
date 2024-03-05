@@ -40,11 +40,11 @@ class TrainParams:
 class ModelParams:
     """Dataset-independent parameters for Main model"""
 
-    conv_out_channels: int = 32
-    kernel_size: int = 5
-    stride: int = 1
-    padding: int = 0
-    pool_size: int = 2
+    conv_out_channels: int = 4
+    kernel_size: int = 6
+    stride: int = 2
+    padding: int = 1
+    pool_size: int = 1
     additional_layers: Optional[List[int]] = None
 
     def get_full_model_params(

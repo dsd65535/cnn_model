@@ -93,6 +93,10 @@ def train_and_test(
         model_params = ModelParams()
     if train_params is None:
         train_params = TrainParams()
+    if nonidealities is None:
+        nonidealities = Nonidealities()
+    if normalization is None:
+        normalization = Normalization()
 
     device = get_device()
 

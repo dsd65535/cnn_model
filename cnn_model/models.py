@@ -82,8 +82,8 @@ class Normalize(torch.nn.Module):
     ) -> None:
         super().__init__()
 
-        self.slope = (max_out - min_out) / (max_in - min_in)
-        self.offset = min_out - self.slope * min_in
+        self.slope = torch.Tensor([(max_out - min_out) / (max_in - min_in)])
+        self.offset = torch.Tensor([min_out - self.slope * min_in])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward function"""

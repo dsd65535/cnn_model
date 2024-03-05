@@ -4,7 +4,7 @@ from typing import Dict
 from typing import Tuple
 
 import torch
-import torchvision
+import torchvision  # type:ignore[import-untyped]
 
 _CACHED_PARAMS: Dict[str, Tuple[int, int, int]] = {}
 DATACACHEDIR = Path("cache/data")

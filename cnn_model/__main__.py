@@ -140,13 +140,10 @@ def train_and_test(
 
         if use_cache:
             MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-            torch.save(model.state_dict(), cache_filepath)
+            torch.save(model.named_state_dict(), cache_filepath)
     else:
-        state_dict = torch.load(cache_filepath)
-        if record:
-            state_dict["layers.6.weight"] = state_dict.pop("layers.5.weight")
-            state_dict["layers.6.bias"] = state_dict.pop("layers.5.bias")
-        model.load_state_dict(state_dict)
+        named_state_dict = torch.load(cache_filepath)
+        model.load_named_state_dict(named_state_dict)
 
     if print_rate is not None:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
@@ -223,7 +220,6 @@ def main() -> None:
         use_cache=not args.no_cache,
         retrain=args.retrain,
         print_rate=args.print_rate,
-        record=True,
     )
 
     if args.timed:

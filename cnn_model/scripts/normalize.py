@@ -14,29 +14,33 @@ def main() -> None:
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
     print(f"Original accuracy: {accuracy}")
 
-    for layer in model.store:
+    for name, layer in model.store.items():
         vals = [val for tensor in layer for val in tensor.flatten().tolist()]
-        print(f"{min(vals)},{max(vals)},{mean(vals)},{median(vals)}")
+        print(f"{name}: {min(vals)},{max(vals)},{mean(vals)},{median(vals)}")
 
-    max0 = max(val for tensor in model.store[0] for val in tensor.flatten().tolist())
-    max1 = max(val for tensor in model.store[1] for val in tensor.flatten().tolist())
+    max_conv2d = max(
+        val for tensor in model.store["conv2d"] for val in tensor.flatten().tolist()
+    )
+    max_linear = max(
+        val for tensor in model.store["linear"] for val in tensor.flatten().tolist()
+    )
 
-    state_dict = model.state_dict()
-    state_dict["layers.1.bias"] /= max0
-    state_dict["layers.1.weight"] /= max0
-    state_dict["layers.6.bias"] /= max1
-    state_dict["layers.6.weight"] /= max1 / max0
-    model.load_state_dict(state_dict)
+    named_state_dict = model.state_dict()
+    named_state_dict["conv2d_bias"] /= max_conv2d
+    named_state_dict["conv2d_weight"] /= max_conv2d
+    named_state_dict["linear_bias"] /= max_linear
+    named_state_dict["linear_weight"] /= max_linear / max_conv2d
+    model.load_named_state_dict(named_state_dict)
 
-    for layer in model.store:
+    for layer in model.store.values():
         layer.clear()
 
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
     print(f"New accuracy: {accuracy}")
 
-    for layer in model.store:
+    for name, layer in model.store.items():
         vals = [val for tensor in layer for val in tensor.flatten().tolist()]
-        print(f"{min(vals)},{max(vals)},{mean(vals)},{median(vals)}")
+        print(f"{name}: {min(vals)},{max(vals)},{mean(vals)},{median(vals)}")
 
 
 if __name__ == "__main__":

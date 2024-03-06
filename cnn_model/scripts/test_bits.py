@@ -35,8 +35,8 @@ def main(
     # pylint:disable=too-many-locals,duplicate-code,too-many-arguments
     """Test the effects of quantization"""
 
-    layer_conv_params = "layers.1.bias" if bias else "layers.1.weight"
-    layer_fc_params = "layers.5.bias" if bias else "layers.5.weight"
+    layer_conv_params = "conv2d_bias" if bias else "conv2d_weight"
+    layer_fc_params = "linear_bias" if bias else "linear_weight"
 
     if model_params is None:
         model_params = ModelParams()
@@ -55,7 +55,7 @@ def main(
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
     print(f"unlimited floats: {accuracy}")
 
-    original_state_dict = {k: v.clone() for k, v in model.state_dict().items()}
+    original_state_dict = {k: v.clone() for k, v in model.named_state_dict().items()}
     original_state_dict[layer_conv_params] = original_state_dict[
         layer_conv_params
     ].apply_(lambda val: min(ref, max(-ref, val)))
@@ -64,7 +64,7 @@ def main(
     )
 
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-    print(f"lmiited floats: {accuracy}")
+    print(f"limited floats: {accuracy}")
 
     print("," + ",".join(str(bits_fc) for bits_fc in range(max_bits)))
     for bits_conv in range(max_bits):
@@ -78,7 +78,7 @@ def main(
             new_state_dict[layer_fc_params] = new_state_dict[layer_fc_params].apply_(
                 lambda val: quantize(val, ref, bits_fc)
             )
-            model.load_state_dict(new_state_dict)
+            model.load_named_state_dict(new_state_dict)
             _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
             results.append(str(accuracy))
         print(f"{bits_conv}," + ",".join(results))

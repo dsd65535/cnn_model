@@ -1,5 +1,6 @@
 """This module defines pyTorch modules and layers"""
 import math
+import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Dict
@@ -8,6 +9,9 @@ from typing import Optional
 from typing import Tuple
 
 import torch
+
+WEIGHT_RE = re.compile(r"layers\.(\d+)\.weight")
+BIAS_RE = re.compile(r"layers\.(\d+)\.bias")
 
 
 @dataclass
@@ -276,3 +280,38 @@ class Main(torch.nn.Module):
         """Total forward computation"""
 
         return self.layers(x)
+
+    def _named_key_from_idx_key(self, idx_key: str) -> str:
+        """Convert an indexed key to a named key"""
+
+        match = WEIGHT_RE.match(idx_key)
+        if match is not None:
+            idx = int(match.group(1))
+            return f"{self.layer_names[idx]}_weight"
+
+        match = BIAS_RE.match(idx_key)
+        if match is not None:
+            idx = int(match.group(1))
+            return f"{self.layer_names[idx]}_bias"
+
+        raise ValueError(f"Cannot parse indexed key: {idx_key}")
+
+    def named_state_dict(self) -> Dict:
+        """Return a state dict using names instead of layer numbers"""
+
+        return {
+            self._named_key_from_idx_key(idx_key): value
+            for idx_key, value in self.state_dict().items()
+        }
+
+    def load_named_state_dict(self, named_state_dict: Dict) -> None:
+        """Load a state dict using names instead of layer numbers"""
+
+        state_dict = {}
+        for idx, name in enumerate(self.layer_names):
+            if f"{name}_weight" in named_state_dict:
+                state_dict[f"layers.{idx}.weight"] = named_state_dict[f"{name}_weight"]
+            if f"{name}_bias" in named_state_dict:
+                state_dict[f"layers.{idx}.bias"] = named_state_dict[f"{name}_bias"]
+
+        self.load_state_dict(state_dict)

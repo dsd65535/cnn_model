@@ -247,6 +247,9 @@ class Main(torch.nn.Module):
                 nonidealities.linear_out_noise,
             )
         )
+        if record:
+            self.store.append([])
+            layers.append(Recorder(self.store[-1]))
 
         self.layers = torch.nn.Sequential(*layers)
 

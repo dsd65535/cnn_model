@@ -2,6 +2,7 @@
 import math
 from dataclasses import dataclass
 from dataclasses import field
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -203,55 +204,73 @@ class Main(torch.nn.Module):
             nonidealities = Nonidealities()
 
         if record:
-            self.store: List[List[torch.Tensor]] = []
+            self.store: Dict[str, List[torch.Tensor]] = {}
 
-        layers: List[torch.nn.Module] = []
+        layers: List[Tuple[torch.nn.Module, str]] = []
 
         if normalization is not None:
             layers.append(
-                Normalize(
-                    normalization.min_out,
-                    normalization.max_out,
-                    normalization.min_in,
-                    normalization.max_in,
+                (
+                    Normalize(
+                        normalization.min_out,
+                        normalization.max_out,
+                        normalization.min_in,
+                        normalization.max_in,
+                    ),
+                    "normalize",
                 )
             )
 
         layers.append(
-            torch.nn.Conv2d(
-                full_model_params.in_channels,
-                full_model_params.conv_out_channels,
-                full_model_params.kernel_size,
-                full_model_params.stride,
-                full_model_params.padding,
+            (
+                torch.nn.Conv2d(
+                    full_model_params.in_channels,
+                    full_model_params.conv_out_channels,
+                    full_model_params.kernel_size,
+                    full_model_params.stride,
+                    full_model_params.padding,
+                ),
+                "conv2d",
             )
         )
         if record:
-            self.store.append([])
-            layers.append(Recorder(self.store[-1]))
-        layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
-        layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
-        layers.append(torch.nn.Flatten())
+            self.store["conv2d"] = []
+            layers.append(((Recorder(self.store["conv2d"]), "conv2d_record")))
+        layers.append(
+            (
+                ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise),
+                "conv2d_relu",
+            )
+        )
+        layers.append((torch.nn.MaxPool2d(full_model_params.pool_size), "maxpool2d"))
+        layers.append((torch.nn.Flatten(), "flatten"))
 
-        for in_size, out_size in full_model_params.additional_layer_sizes:
-            layers.append(Linear(in_size, out_size))
+        for idx, (in_size, out_size) in enumerate(
+            full_model_params.additional_layer_sizes
+        ):
+            name = f"additional_linear_{idx}"
+            layers.append((Linear(in_size, out_size), name))
             if record:
-                self.store.append([])
-                layers.append(Recorder(self.store[-1]))
-            layers.append(ReLU())
+                self.store[name] = []
+                layers.append((Recorder(self.store[name]), f"{name}_record"))
+            layers.append((ReLU(), f"{name}_relu"))
 
         layers.append(
-            Linear(
-                full_model_params.final_size,
-                full_model_params.feature_count,
-                nonidealities.linear_out_noise,
+            (
+                Linear(
+                    full_model_params.final_size,
+                    full_model_params.feature_count,
+                    nonidealities.linear_out_noise,
+                ),
+                "linear",
             )
         )
         if record:
-            self.store.append([])
-            layers.append(Recorder(self.store[-1]))
+            self.store["linear"] = []
+            layers.append(((Recorder(self.store["linear"]), "linear_record")))
 
-        self.layers = torch.nn.Sequential(*layers)
+        self.layers = torch.nn.Sequential(*(layer for layer, _ in layers))
+        self.layer_names = [name for _, name in layers]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Total forward computation"""

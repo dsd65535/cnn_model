@@ -169,35 +169,95 @@ class Main(torch.nn.Module):
                     normalization.max_in,
                 )
             )
-
-        layers.append(
+            layers.append(
             torch.nn.Conv2d(
                 full_model_params.in_channels,
                 full_model_params.conv_out_channels,
                 full_model_params.kernel_size,
                 full_model_params.stride,
-                full_model_params.padding,
+                full_model_params.padding,))
+            layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+            layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
             )
-        )
+            #layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+            layers.append(
+            torch.nn.Conv2d(
+            in_channels=32, 
+            out_channels=64, 
+            kernel_size=(3,3), 
+            padding=(1,1)))
+            layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+            layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                )
+            )
+    
+            layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+            layers.append(torch.nn.Dropout(p=0.3))
+        
+        layers.append(
+            torch.nn.Conv2d(
+            in_channels=64, 
+            out_channels=128, 
+            kernel_size=(3,3), 
+            padding=(1,1)))
         layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+        layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                ))
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
-        layers.append(torch.nn.Flatten())
 
+        layers.append(torch.nn.Dropout(p=0.5))
+        layers.append(
+            torch.nn.Conv2d(
+            in_channels=128, 
+            out_channels=128, 
+            kernel_size=(3,3), 
+            padding=(1,1)))
+        layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
+        layers.append(
+                Normalize(
+                    normalization.min_out,
+                    normalization.max_out,
+                    normalization.min_in,
+                    normalization.max_in,
+                ))
+        layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
+       # layers.append(torch.nn.Dropout(p=0.5))
+
+        layers.append(torch.nn.Flatten())
         for in_size, out_size in full_model_params.additional_layer_sizes:
             layers.append(Linear(in_size, out_size))
+            layers.append(torch.nn.Dropout(p=0.5))
             layers.append(ReLU())
-
+       # layers.append(torch.nn.Dropout(p=0.5))
         layers.append(
             Linear(
-                full_model_params.final_size,
+                1152,
                 full_model_params.feature_count,
                 nonidealities.linear_out_noise,
             )
         )
-
+        # soft max
+# fully connected layer output size: n_out = (n_in+2p-k)/s + 1
+        # p = padding size, k = kernal size, s = stride
         self.layers = torch.nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Total forward computation"""
-
+        
         return self.layers(x)

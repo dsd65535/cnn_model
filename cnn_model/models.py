@@ -179,6 +179,25 @@ class Main(torch.nn.Module):
                 full_model_params.padding,
             )
         )
+        layers.append(
+            torch.nn.Conv2d(
+            in_channels=32, 
+            out_channels=96, 
+            kernel_size=(3,3), 
+            padding=(1,1)))
+        layers.append(
+            torch.nn.Conv2d(
+            in_channels=96, 
+            out_channels=192, 
+            kernel_size=(3,3), 
+            padding=(1,1)))
+        layers.append(
+            torch.nn.Conv2d(
+            in_channels=192, 
+            out_channels=256, 
+            kernel_size=(3,3),
+            padding=(1,1)))
+
         layers.append(ReLU(nonidealities.relu_cutoff, nonidealities.relu_out_noise))
         layers.append(torch.nn.MaxPool2d(full_model_params.pool_size))
         layers.append(torch.nn.Flatten())

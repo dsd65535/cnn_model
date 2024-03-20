@@ -1,5 +1,8 @@
 """This script test the effects of quantization on accuracy"""
+from statistics import stdev
 from typing import Optional
+
+import numpy as np
 
 from cnn_model.__main__ import ModelParams
 from cnn_model.__main__ import train_and_test
@@ -13,16 +16,19 @@ def quantize(val: float, ref: float, bits: int) -> float:
     """Quantize a value to a number of bits not counting sign"""
 
     step = ref / 2**bits
+    val_qtn = (round(val / step + 0.5) - 0.5) * step
 
-    return max(
-        min((round(val / step + 0.5) - 0.5) * step, ref - step / 2), -ref + step / 2
-    )
+    return max(min(val_qtn, ref - step / 2), -ref + step / 2)
 
 
 def main(
+    min_bits: int = 0,
     max_bits: int = 7,
-    ref: float = 0.5,
-    bias: bool = False,
+    min_ref: float = 0.1,
+    max_ref: float = 3.0,
+    count_ref: int = 30,
+    look_at_linear_layer: bool = True,
+    look_at_bias: bool = False,
     dataset_name: str = "MNIST",
     train_params: Optional[TrainParams] = None,
     model_params: Optional[ModelParams] = None,
@@ -35,8 +41,11 @@ def main(
     # pylint:disable=too-many-locals,duplicate-code,too-many-arguments
     """Test the effects of quantization"""
 
-    layer_conv_params = "conv2d_bias" if bias else "conv2d_weight"
-    layer_fc_params = "linear_bias" if bias else "linear_weight"
+    layer_params = (
+        ("linear_bias" if look_at_bias else "linear_weight")
+        if look_at_linear_layer
+        else ("conv2d_bias" if look_at_bias else "conv2d_weight")
+    )
 
     if model_params is None:
         model_params = ModelParams()
@@ -53,35 +62,39 @@ def main(
     )
 
     _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-    print(f"unlimited floats: {accuracy}")
+    print(f"Unlimited Accuracy: {accuracy}")
 
     original_state_dict = {k: v.clone() for k, v in model.named_state_dict().items()}
-    original_state_dict[layer_conv_params] = original_state_dict[
-        layer_conv_params
-    ].apply_(lambda val: min(ref, max(-ref, val)))
-    original_state_dict[layer_fc_params] = original_state_dict[layer_fc_params].apply_(
-        lambda val: min(ref, max(-ref, val))
+    weight_stdev = stdev(original_state_dict[layer_params].flatten().tolist())
+
+    print(
+        "ref,float,"
+        + ",".join(str(count_bits) for count_bits in range(min_bits, max_bits + 1))
     )
 
-    _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-    print(f"limited floats: {accuracy}")
+    for ref in np.linspace(min_ref * weight_stdev, max_ref * weight_stdev, count_ref):
+        # pylint:disable=cell-var-from-loop
+        print(ref, end=",")
 
-    print("," + ",".join(str(bits_fc) for bits_fc in range(max_bits)))
-    for bits_conv in range(max_bits):
-        results = []
-        for bits_fc in range(max_bits):
+        limited_state_dict = {k: v.clone() for k, v in original_state_dict.items()}
+        limited_state_dict[layer_params] = limited_state_dict[layer_params].apply_(
+            lambda val: min(ref, max(-ref, val))
+        )
+        model.load_named_state_dict(limited_state_dict)
+        _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
+        print(accuracy, end=",")
+
+        for count_bits in range(min_bits, max_bits + 1):
             # pylint:disable=cell-var-from-loop
-            new_state_dict = {k: v.clone() for k, v in original_state_dict.items()}
-            new_state_dict[layer_conv_params] = new_state_dict[
-                layer_conv_params
-            ].apply_(lambda val: quantize(val, ref, bits_conv))
-            new_state_dict[layer_fc_params] = new_state_dict[layer_fc_params].apply_(
-                lambda val: quantize(val, ref, bits_fc)
+            new_state_dict = {k: v.clone() for k, v in limited_state_dict.items()}
+            new_state_dict[layer_params] = new_state_dict[layer_params].apply_(
+                lambda val: quantize(val, ref, count_bits)
             )
             model.load_named_state_dict(new_state_dict)
             _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-            results.append(str(accuracy))
-        print(f"{bits_conv}," + ",".join(results))
+            print(accuracy, end=",")
+
+        print()
 
 
 if __name__ == "__main__":

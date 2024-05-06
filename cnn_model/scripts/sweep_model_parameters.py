@@ -49,14 +49,9 @@ def generate_model_params(dataset_name: str) -> List[ModelParams]:
                                 )
                             except ValueError:
                                 continue
-                            weight = (
-                                full_model_params.conv_out_size**2
-                                * full_model_params.conv_out_channels
-                                * full_model_params.kernel_size**2
-                                + full_model_params.final_size
-                                * full_model_params.feature_count
+                            model_params_list.append(
+                                (full_model_params.multiplier_count, model_params)
                             )
-                            model_params_list.append((weight, model_params))
 
     return [
         model_params

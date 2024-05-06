@@ -40,11 +40,11 @@ class TrainParams:
 class ModelParams:
     """Dataset-independent parameters for Main model"""
 
-    conv_out_channels: int = 32
-    kernel_size: int = 5
-    stride: int = 1
-    padding: int = 0
-    pool_size: int = 2
+    conv_out_channels: int = 4
+    kernel_size: int = 6
+    stride: int = 2
+    padding: int = 1
+    pool_size: int = 1
     additional_layers: Optional[List[int]] = None
 
     def get_full_model_params(
@@ -80,6 +80,7 @@ def train_and_test(
     use_cache: bool = True,
     retrain: bool = False,
     print_rate: Optional[int] = None,
+    record: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
     # pylint:disable=too-many-arguments,too-many-locals
     """Train and Test the Main model
@@ -92,6 +93,10 @@ def train_and_test(
         model_params = ModelParams()
     if train_params is None:
         train_params = TrainParams()
+    if nonidealities is None:
+        nonidealities = Nonidealities()
+    if normalization is None:
+        normalization = Normalization()
 
     device = get_device()
 
@@ -103,6 +108,7 @@ def train_and_test(
         model_params.get_full_model_params(*dataset_params),
         nonidealities,
         normalization,
+        record,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
@@ -134,9 +140,10 @@ def train_and_test(
 
         if use_cache:
             MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-            torch.save(model.state_dict(), cache_filepath)
+            torch.save(model.named_state_dict(), cache_filepath)
     else:
-        model.load_state_dict(torch.load(cache_filepath))
+        named_state_dict = torch.load(cache_filepath)
+        model.load_named_state_dict(named_state_dict)
 
     if print_rate is not None:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)

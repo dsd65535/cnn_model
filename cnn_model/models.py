@@ -136,7 +136,9 @@ class Normalize(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward function"""
 
-        return torch.add(self.offset, torch.multiply(self.slope, x))
+        return torch.add(
+            self.offset.to(x.device), torch.multiply(self.slope.to(x.device), x)
+        )
 
 
 class ReLU(torch.nn.Module):

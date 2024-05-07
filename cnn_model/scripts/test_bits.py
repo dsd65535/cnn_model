@@ -77,8 +77,11 @@ def main(
         print(ref, end=",")
 
         limited_state_dict = {k: v.clone() for k, v in original_state_dict.items()}
-        limited_state_dict[layer_params] = limited_state_dict[layer_params].apply_(
-            lambda val: min(ref, max(-ref, val))
+        limited_state_dict[layer_params] = (
+            limited_state_dict[layer_params]
+            .to("cpu")
+            .apply_(lambda val: min(ref, max(-ref, val)))
+            .to(device)
         )
         model.load_named_state_dict(limited_state_dict)
         _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
@@ -87,8 +90,11 @@ def main(
         for count_bits in range(min_bits, max_bits + 1):
             # pylint:disable=cell-var-from-loop
             new_state_dict = {k: v.clone() for k, v in limited_state_dict.items()}
-            new_state_dict[layer_params] = new_state_dict[layer_params].apply_(
-                lambda val: quantize(val, ref, count_bits)
+            new_state_dict[layer_params] = (
+                new_state_dict[layer_params]
+                .to("cpu")
+                .apply_(lambda val: quantize(val, ref, count_bits))
+                .to(device)
             )
             model.load_named_state_dict(new_state_dict)
             _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)

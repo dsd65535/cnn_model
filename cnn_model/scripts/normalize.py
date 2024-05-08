@@ -25,7 +25,7 @@ def main() -> None:
         val for tensor in model.store["linear"] for val in tensor.flatten().tolist()
     )
 
-    named_state_dict = model.state_dict()
+    named_state_dict = model.named_state_dict()
     named_state_dict["conv2d_bias"] /= max_conv2d
     named_state_dict["conv2d_weight"] /= max_conv2d
     named_state_dict["linear_bias"] /= max_linear

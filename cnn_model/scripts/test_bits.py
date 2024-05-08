@@ -10,15 +10,7 @@ from cnn_model.__main__ import TrainParams
 from cnn_model.basic import test_model
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
-
-
-def quantize(val: float, ref: float, bits: int) -> float:
-    """Quantize a value to a number of bits not counting sign"""
-
-    step = ref / 2**bits
-    val_qtn = (round(val / step + 0.5) - 0.5) * step
-
-    return max(min(val_qtn, ref - step / 2), -ref + step / 2)
+from cnn_model.quantize import quantize_values_ref
 
 
 def main(
@@ -88,13 +80,9 @@ def main(
         print(accuracy, end=",")
 
         for count_bits in range(min_bits, max_bits + 1):
-            # pylint:disable=cell-var-from-loop
             new_state_dict = {k: v.clone() for k, v in limited_state_dict.items()}
-            new_state_dict[layer_params] = (
-                new_state_dict[layer_params]
-                .to("cpu")
-                .apply_(lambda val: quantize(val, ref, count_bits))
-                .to(device)
+            new_state_dict[layer_params] = quantize_values_ref(
+                new_state_dict[layer_params], count_bits, ref
             )
             model.load_named_state_dict(new_state_dict)
             _, accuracy = test_model(model, test_dataloader, loss_fn, device=device)

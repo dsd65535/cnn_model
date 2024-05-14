@@ -226,6 +226,9 @@ class Main(torch.nn.Module):
                     "normalize",
                 )
             )
+        if record:
+            self.store["input"] = []
+            layers.append(((Recorder(self.store["input"]), "input_record")))
 
         layers.append(
             (

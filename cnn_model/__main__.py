@@ -1,5 +1,6 @@
 """This script trains and tests the Main model"""
 import argparse
+import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,7 +122,7 @@ def train_and_test(
     if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(train_params.count_epoch):
             if print_rate is not None:
-                print(f"Epoch {idx_epoch+1}/{train_params.count_epoch}:")
+                logging.info("Epoch %s/%s:", idx_epoch + 1, train_params.count_epoch)
             train_model(
                 model,
                 train_dataloader,
@@ -135,9 +136,8 @@ def train_and_test(
                 avg_loss, accuracy = test_model(
                     model, test_dataloader, loss_fn, device=device
                 )
-                print(f"Average Loss:  {avg_loss:<9f}")
-                print(f"Accuracy:      {(100*accuracy):<0.4f}%")
-                print()
+                logging.info("Average Loss:  %s:<9f", avg_loss)
+                logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
 
         if use_cache:
             MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
@@ -148,12 +148,12 @@ def train_and_test(
 
     if print_rate is not None:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        print(f"Average Loss:  {avg_loss:<9f}")
-        print(f"Accuracy:      {(100*accuracy):<0.4f}%")
+        logging.info("Average Loss:  %s:<9f", avg_loss)
+        logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
 
     if normalize:
         if print_rate is not None:
-            print("Normalizing...")
+            logging.info("Normalizing...")
         cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_norm.pth")
         MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
         for layer in model.store.values():
@@ -167,8 +167,8 @@ def train_and_test(
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
-            print(f"Average Loss:  {avg_loss:<9f}")
-            print(f"Accuracy:      {(100*accuracy):<0.4f}%")
+            logging.info("Average Loss:  %s:<9f", avg_loss)
+            logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
 
     return model, loss_fn, test_dataloader, device
 
@@ -198,15 +198,16 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Main Function"""
 
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     args = parse_args()
 
     if args.print_git_info:
         repo = git.Repo(search_parent_directories=True)
-        print(f"Git SHA: {repo.head.object.hexsha}")
+        logging.info("Git SHA: %s", repo.head.object.hexsha)
         diff = repo.git.diff()
         if diff:
-            print(repo.git.diff())
-        print()
+            logging.info(repo.git.diff())
 
     if args.timed:
         start = time.time()
@@ -246,7 +247,7 @@ def main() -> None:
 
     if args.timed:
         end = time.time()
-        print(f"{start} : {end} ({end - start})")
+        logging.info("%s : %s (%s)", start, end, end - start)
 
 
 if __name__ == "__main__":

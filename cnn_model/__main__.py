@@ -18,6 +18,7 @@ from cnn_model.models import FullModelParams
 from cnn_model.models import Main
 from cnn_model.models import Nonidealities
 from cnn_model.models import Normalization
+from cnn_model.normalize import normalize_values
 from cnn_model.parser import add_arguments_from_dataclass_fields
 
 MODELCACHEDIR = Path("cache/models")
@@ -81,8 +82,9 @@ def train_and_test(
     retrain: bool = False,
     print_rate: Optional[int] = None,
     record: bool = False,
+    normalize: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
-    # pylint:disable=too-many-arguments,too-many-locals
+    # pylint:disable=too-many-arguments,too-many-locals,too-many-branches
     """Train and Test the Main model
 
     This function is based on:
@@ -108,14 +110,13 @@ def train_and_test(
         model_params.get_full_model_params(*dataset_params),
         nonidealities,
         normalization,
-        record,
+        record or normalize,
     ).to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
 
-    cache_filepath = Path(
-        f"{MODELCACHEDIR}/{dataset_name}_{train_params}_{model_params}_{nonidealities}.pth"
-    )
+    cache_basename = f"{dataset_name}_{train_params}_{model_params}_{nonidealities}"
+    cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}.pth")
 
     if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(train_params.count_epoch):
@@ -150,6 +151,25 @@ def train_and_test(
         print(f"Average Loss:  {avg_loss:<9f}")
         print(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
+    if normalize:
+        if print_rate is not None:
+            print("Normalizing...")
+        cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_norm.pth")
+        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+        for layer in model.store.values():
+            layer.clear()
+        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
+        torch.save(
+            normalize_values(model.named_state_dict(), model.store), cache_filepath
+        )
+
+        if print_rate is not None:
+            avg_loss, accuracy = test_model(
+                model, test_dataloader, loss_fn, device=device
+            )
+            print(f"Average Loss:  {avg_loss:<9f}")
+            print(f"Accuracy:      {(100*accuracy):<0.4f}%")
+
     return model, loss_fn, test_dataloader, device
 
 
@@ -168,6 +188,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--print_rate", type=int, nargs="?")
+    parser.add_argument("--normalize", action="store_true")
     parser.add_argument("--print_git_info", action="store_true")
     parser.add_argument("--timed", action="store_true")
 
@@ -220,6 +241,7 @@ def main() -> None:
         use_cache=not args.no_cache,
         retrain=args.retrain,
         print_rate=args.print_rate,
+        normalize=args.normalize,
     )
 
     if args.timed:

@@ -1,3 +1,4 @@
+# pylint:disable=logging-fstring-interpolation
 """This script trains and tests the Main model"""
 import argparse
 import logging
@@ -122,7 +123,7 @@ def train_and_test(
     if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(train_params.count_epoch):
             if print_rate is not None:
-                logging.info("Epoch %s/%s:", idx_epoch + 1, train_params.count_epoch)
+                logging.info(f"Epoch {idx_epoch+1}/{train_params.count_epoch}:")
             train_model(
                 model,
                 train_dataloader,
@@ -136,8 +137,8 @@ def train_and_test(
                 avg_loss, accuracy = test_model(
                     model, test_dataloader, loss_fn, device=device
                 )
-                logging.info("Average Loss:  %s:<9f", avg_loss)
-                logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
+                logging.info(f"Average Loss:  {avg_loss:<9f}")
+                logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
         if use_cache:
             MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
@@ -148,8 +149,8 @@ def train_and_test(
 
     if print_rate is not None:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        logging.info("Average Loss:  %s:<9f", avg_loss)
-        logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
+        logging.info(f"Average Loss:  {avg_loss:<9f}")
+        logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
     if normalize:
         if print_rate is not None:
@@ -167,8 +168,8 @@ def train_and_test(
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
-            logging.info("Average Loss:  %s:<9f", avg_loss)
-            logging.info("Accuracy:      %s:<0.4f%%", (100 * accuracy))
+            logging.info(f"Average Loss:  {avg_loss:<9f}")
+            logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
     return model, loss_fn, test_dataloader, device
 
@@ -204,7 +205,7 @@ def main() -> None:
 
     if args.print_git_info:
         repo = git.Repo(search_parent_directories=True)
-        logging.info("Git SHA: %s", repo.head.object.hexsha)
+        logging.info(f"Git SHA: {repo.head.object.hexsha}")
         diff = repo.git.diff()
         if diff:
             logging.info(repo.git.diff())
@@ -247,7 +248,7 @@ def main() -> None:
 
     if args.timed:
         end = time.time()
-        logging.info("%s : %s (%s)", start, end, end - start)
+        logging.info(f"{start} : {end} ({end - start})")
 
 
 if __name__ == "__main__":

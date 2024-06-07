@@ -1,3 +1,4 @@
+# pylint:disable=logging-fstring-interpolation
 """This module provides basic functions"""
 import logging
 from typing import Optional
@@ -55,10 +56,7 @@ def train_model(
 
         if print_rate is not None and idx_batch % print_rate == print_rate - 1:
             logging.info(
-                "[%s:>5d/%s:>5d] %s:<9f",
-                (idx_batch + 1) * len(tensor_in),
-                total_size,
-                loss.item(),
+                f"[{(idx_batch + 1) * len(tensor_in):>5d}/{total_size:>5d}]  {loss.item():<9f}"
             )
 
 

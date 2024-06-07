@@ -83,6 +83,7 @@ def train_and_test(
     use_cache: bool = True,
     retrain: bool = False,
     print_rate: Optional[int] = None,
+    test_each_epoch: bool = False,
     record: bool = False,
     normalize: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
@@ -103,6 +104,7 @@ def train_and_test(
         normalization = Normalization()
 
     device = get_device()
+    logger = logging.getLogger()
 
     (train_dataloader, test_dataloader), dataset_params = get_dataset_and_params(
         name=dataset_name, batch_size=train_params.batch_size
@@ -122,8 +124,7 @@ def train_and_test(
 
     if not use_cache or retrain or not cache_filepath.exists():
         for idx_epoch in range(train_params.count_epoch):
-            if print_rate is not None:
-                logging.info(f"Epoch {idx_epoch+1}/{train_params.count_epoch}:")
+            logging.info(f"Epoch {idx_epoch+1}/{train_params.count_epoch}")
             train_model(
                 model,
                 train_dataloader,
@@ -133,7 +134,11 @@ def train_and_test(
                 print_rate=print_rate,
                 noise=train_params.noise_train,
             )
-            if print_rate is not None and idx_epoch < train_params.count_epoch - 1:
+            if (
+                logger.getEffectiveLevel() >= logging.INFO
+                and test_each_epoch
+                and idx_epoch < train_params.count_epoch - 1
+            ):
                 avg_loss, accuracy = test_model(
                     model, test_dataloader, loss_fn, device=device
                 )
@@ -147,14 +152,13 @@ def train_and_test(
         named_state_dict = torch.load(cache_filepath)
         model.load_named_state_dict(named_state_dict)
 
-    if print_rate is not None:
+    if logger.getEffectiveLevel() >= logging.INFO:
         avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
         logging.info(f"Average Loss:  {avg_loss:<9f}")
         logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
     if normalize:
-        if print_rate is not None:
-            logging.info("Normalizing...")
+        logging.info("Normalizing...")
         cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_norm.pth")
         MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
         for layer in model.store.values():
@@ -164,7 +168,7 @@ def train_and_test(
             normalize_values(model.named_state_dict(), model.store), cache_filepath
         )
 
-        if print_rate is not None:
+        if logger.getEffectiveLevel() >= logging.INFO:
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
@@ -189,6 +193,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no_cache", action="store_true")
     parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--print_rate", type=int, nargs="?")
+    parser.add_argument("--test_each_epoch", action="store_true")
     parser.add_argument("--normalize", action="store_true")
     parser.add_argument("--print_git_info", action="store_true")
     parser.add_argument("--timed", action="store_true")
@@ -243,6 +248,7 @@ def main() -> None:
         use_cache=not args.no_cache,
         retrain=args.retrain,
         print_rate=args.print_rate,
+        test_each_epoch=args.test_each_epoch,
         normalize=args.normalize,
     )
 

@@ -29,8 +29,8 @@ def run(
     model_params: Optional[ModelParams] = None,
     nonidealities: Optional[Nonidealities] = None,
     normalization: Optional[Normalization] = None,
+    count_epoch: int = 5,
     use_cache: bool = True,
-    retrain: bool = False,
     print_rate: Optional[int] = None,
 ) -> None:
     # pylint:disable=too-many-arguments,too-many-locals
@@ -51,8 +51,8 @@ def run(
             model_params=model_params,
             nonidealities=nonidealities,
             normalization=normalization,
+            count_epoch=count_epoch,
             use_cache=use_cache,
-            retrain=retrain,
             print_rate=print_rate,
         )
 
@@ -82,8 +82,8 @@ def parse_args() -> argparse.Namespace:
     add_arguments_from_dataclass_fields(ModelParams, parser)
     add_arguments_from_dataclass_fields(Nonidealities, parser)
     add_arguments_from_dataclass_fields(Normalization, parser)
+    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--no_cache", action="store_true")
-    parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--print_git_info", action="store_true")
     parser.add_argument("--timed", action="store_true")
@@ -113,7 +113,6 @@ def main() -> None:
         args.output_filepath,
         dataset_name=args.dataset_name,
         train_params=TrainParams(
-            count_epoch=args.count_epoch,
             batch_size=args.batch_size,
             lr=args.lr,
             noise_train=args.noise_train,
@@ -137,8 +136,8 @@ def main() -> None:
             min_in=args.min_in,
             max_in=args.max_in,
         ),
+        count_epoch=args.count_epoch,
         use_cache=not args.no_cache,
-        retrain=args.retrain,
         print_rate=args.print_rate,
     )
 

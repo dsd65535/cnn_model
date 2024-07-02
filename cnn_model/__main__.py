@@ -2,6 +2,7 @@
 """This script trains and tests the Main model"""
 import argparse
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,13 +31,12 @@ MODELCACHEDIR = Path("cache/models")
 class TrainParams:
     """Parameters used during training"""
 
-    count_epoch: int = 5
     batch_size: int = 1
     lr: float = 1e-3
     noise_train: Optional[float] = None
 
     def __str__(self) -> str:
-        return f"{self.count_epoch}_{self.batch_size}_{self.lr}_{self.noise_train}"
+        return f"{self.batch_size}_{self.lr}_{self.noise_train}"
 
 
 @dataclass
@@ -74,20 +74,47 @@ class ModelParams:
         )
 
 
+def get_largest_cached_epoch_number(search_dirpath: Path, basename: str) -> int:
+    """Get the largest epoch number cached in a directory"""
+    cached_indices = []
+    for filepath in search_dirpath.glob("*"):
+        match = re.match(rf"{search_dirpath}/{basename}_(\d+).pth", str(filepath))
+        if match is None:
+            continue
+        cached_indices.append(int(match.group(1)))
+
+    largest_cached_epoch_number = len(cached_indices)
+
+    if largest_cached_epoch_number > 0:
+        if len(set(cached_indices)) != largest_cached_epoch_number:
+            raise RuntimeError("Indices not unique")
+        if min(cached_indices) != 1:
+            raise RuntimeError(
+                f"Expected minimum index to be 1, not {min(cached_indices)}"
+            )
+        if max(cached_indices) != largest_cached_epoch_number:
+            raise RuntimeError(
+                f"Expected minimum index to be {largest_cached_epoch_number}, "
+                f"not {max(cached_indices)}"
+            )
+
+    return largest_cached_epoch_number
+
+
 def train_and_test(
     dataset_name: str = "MNIST",
     train_params: Optional[TrainParams] = None,
     model_params: Optional[ModelParams] = None,
     nonidealities: Optional[Nonidealities] = None,
     normalization: Optional[Normalization] = None,
+    count_epoch: int = 5,
     use_cache: bool = True,
-    retrain: bool = False,
     print_rate: Optional[int] = None,
     test_each_epoch: bool = False,
     record: bool = False,
     normalize: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
-    # pylint:disable=too-many-arguments,too-many-locals,too-many-branches
+    # pylint:disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
     """Train and Test the Main model
 
     This function is based on:
@@ -104,8 +131,9 @@ def train_and_test(
         normalization = Normalization()
 
     device = get_device()
-    logger = logging.getLogger()
+    logging_info = logging.getLogger().getEffectiveLevel() >= logging.INFO
 
+    logging.info("Loading dataset...")
     (train_dataloader, test_dataloader), dataset_params = get_dataset_and_params(
         name=dataset_name, batch_size=train_params.batch_size
     )
@@ -120,11 +148,30 @@ def train_and_test(
     optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
 
     cache_basename = f"{dataset_name}_{train_params}_{model_params}_{nonidealities}"
-    cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}.pth")
+    if use_cache:
+        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
+        largest_cached_epoch_number = get_largest_cached_epoch_number(
+            MODELCACHEDIR, cache_basename
+        )
+    else:
+        largest_cached_epoch_number = 0
 
-    if not use_cache or retrain or not cache_filepath.exists():
-        for idx_epoch in range(train_params.count_epoch):
-            logging.info(f"Epoch {idx_epoch+1}/{train_params.count_epoch}")
+    for idx_epoch in range(count_epoch):
+        last_epoch = idx_epoch == count_epoch - 1
+        train_this_epoch = idx_epoch >= largest_cached_epoch_number
+        train_next_epoch = idx_epoch >= largest_cached_epoch_number - 1
+        test_this_epoch = (logging_info and (test_each_epoch or last_epoch)) or (
+            normalize and last_epoch
+        )
+
+        if not train_this_epoch and not train_next_epoch and not test_this_epoch:
+            continue
+
+        logging.info(f"Epoch {idx_epoch+1}/{count_epoch}")
+        cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_{idx_epoch+1}.pth")
+
+        if train_this_epoch:
+            logging.info("Training...")
             train_model(
                 model,
                 train_dataloader,
@@ -134,41 +181,37 @@ def train_and_test(
                 print_rate=print_rate,
                 noise=train_params.noise_train,
             )
-            if (
-                logger.getEffectiveLevel() >= logging.INFO
-                and test_each_epoch
-                and idx_epoch < train_params.count_epoch - 1
-            ):
-                avg_loss, accuracy = test_model(
-                    model, test_dataloader, loss_fn, device=device
-                )
-                logging.info(f"Average Loss:  {avg_loss:<9f}")
-                logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
+            if use_cache:
+                logging.info(f"Saving to {cache_filepath}...")
+                torch.save(model.named_state_dict(), cache_filepath)
+        else:
+            logging.info(f"Loading from {cache_filepath}...")
+            named_state_dict = torch.load(cache_filepath)
+            model.load_named_state_dict(named_state_dict)
 
-        if use_cache:
-            MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-            torch.save(model.named_state_dict(), cache_filepath)
-    else:
-        named_state_dict = torch.load(cache_filepath)
-        model.load_named_state_dict(named_state_dict)
-
-    if logger.getEffectiveLevel() >= logging.INFO:
-        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        logging.info(f"Average Loss:  {avg_loss:<9f}")
-        logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
+        if test_this_epoch:
+            if normalize and last_epoch:
+                for layer in model.store.values():
+                    layer.clear()
+            logging.info("Testing...")
+            avg_loss, accuracy = test_model(
+                model, test_dataloader, loss_fn, device=device
+            )
+            logging.info(f"Average Loss:  {avg_loss:<9f}")
+            logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
     if normalize:
         logging.info("Normalizing...")
-        cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_norm.pth")
-        MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-        for layer in model.store.values():
-            layer.clear()
-        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        torch.save(
-            normalize_values(model.named_state_dict(), model.store), cache_filepath
-        )
+        normalize_values(model.named_state_dict(), model.store)
 
-        if logger.getEffectiveLevel() >= logging.INFO:
+        if use_cache:
+            cache_filepath = Path(
+                f"{MODELCACHEDIR}/{cache_basename}_{count_epoch}_norm.pth"
+            )
+            torch.save(model.named_state_dict(), cache_filepath)
+
+        if logging_info:
+            logging.info("Testing...")
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
@@ -190,8 +233,8 @@ def parse_args() -> argparse.Namespace:
     add_arguments_from_dataclass_fields(ModelParams, parser)
     add_arguments_from_dataclass_fields(Nonidealities, parser)
     add_arguments_from_dataclass_fields(Normalization, parser)
+    parser.add_argument("--count_epoch", type=int, default=5)
     parser.add_argument("--no_cache", action="store_true")
-    parser.add_argument("--retrain", action="store_true")
     parser.add_argument("--print_rate", type=int, nargs="?")
     parser.add_argument("--test_each_epoch", action="store_true")
     parser.add_argument("--normalize", action="store_true")
@@ -205,6 +248,7 @@ def main() -> None:
     """Main Function"""
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.info("Imports done, running script...")
 
     args = parse_args()
 
@@ -221,7 +265,6 @@ def main() -> None:
     train_and_test(
         dataset_name=args.dataset_name,
         train_params=TrainParams(
-            count_epoch=args.count_epoch,
             batch_size=args.batch_size,
             lr=args.lr,
             noise_train=args.noise_train,
@@ -245,8 +288,8 @@ def main() -> None:
             min_in=args.min_in,
             max_in=args.max_in,
         ),
+        count_epoch=args.count_epoch,
         use_cache=not args.no_cache,
-        retrain=args.retrain,
         print_rate=args.print_rate,
         test_each_epoch=args.test_each_epoch,
         normalize=args.normalize,

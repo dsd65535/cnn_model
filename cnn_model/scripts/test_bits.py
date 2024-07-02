@@ -26,8 +26,8 @@ def main(
     model_params: Optional[ModelParams] = None,
     nonidealities: Optional[Nonidealities] = None,
     normalization: Optional[Normalization] = None,
+    count_epoch: int = 5,
     use_cache: bool = True,
-    retrain: bool = False,
     print_rate: Optional[int] = None,
 ) -> None:
     # pylint:disable=too-many-locals,duplicate-code,too-many-arguments
@@ -48,8 +48,8 @@ def main(
         model_params=model_params,
         nonidealities=nonidealities,
         normalization=normalization,
+        count_epoch=count_epoch,
         use_cache=use_cache,
-        retrain=retrain,
         print_rate=print_rate,
     )
 

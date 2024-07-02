@@ -2,6 +2,7 @@
 """This script trains and tests the Main model"""
 import argparse
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,6 +74,33 @@ class ModelParams:
         )
 
 
+def get_largest_cached_epoch_number(search_dirpath: Path, basename: str) -> int:
+    """Get the largest epoch number cached in a directory"""
+    cached_indices = []
+    for filepath in search_dirpath.glob("*"):
+        match = re.match(rf"{search_dirpath}/{basename}_(\d+).pth", str(filepath))
+        if match is None:
+            continue
+        cached_indices.append(int(match.group(1)))
+
+    largest_cached_epoch_number = len(cached_indices)
+
+    if largest_cached_epoch_number > 0:
+        if len(set(cached_indices)) != largest_cached_epoch_number:
+            raise RuntimeError("Indices not unique")
+        if min(cached_indices) != 1:
+            raise RuntimeError(
+                f"Expected minimum index to be 1, not {min(cached_indices)}"
+            )
+        if max(cached_indices) != largest_cached_epoch_number:
+            raise RuntimeError(
+                f"Expected minimum index to be {largest_cached_epoch_number}, "
+                f"not {max(cached_indices)}"
+            )
+
+    return largest_cached_epoch_number
+
+
 def train_and_test(
     dataset_name: str = "MNIST",
     train_params: Optional[TrainParams] = None,
@@ -86,7 +114,7 @@ def train_and_test(
     record: bool = False,
     normalize: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.utils.data.DataLoader, str]:
-    # pylint:disable=too-many-arguments,too-many-locals,too-many-branches
+    # pylint:disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
     """Train and Test the Main model
 
     This function is based on:
@@ -103,8 +131,9 @@ def train_and_test(
         normalization = Normalization()
 
     device = get_device()
-    logger = logging.getLogger()
+    logging_info = logging.getLogger().getEffectiveLevel() >= logging.INFO
 
+    logging.info("Loading dataset...")
     (train_dataloader, test_dataloader), dataset_params = get_dataset_and_params(
         name=dataset_name, batch_size=train_params.batch_size
     )
@@ -118,25 +147,31 @@ def train_and_test(
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=train_params.lr)
 
+    cache_basename = f"{dataset_name}_{train_params}_{model_params}_{nonidealities}"
     if use_cache:
         MODELCACHEDIR.mkdir(parents=True, exist_ok=True)
-    cache_basename = f"{dataset_name}_{train_params}_{model_params}_{nonidealities}"
-    training_started = False
+        largest_cached_epoch_number = get_largest_cached_epoch_number(
+            MODELCACHEDIR, cache_basename
+        )
+    else:
+        largest_cached_epoch_number = 0
 
     for idx_epoch in range(count_epoch):
+        last_epoch = idx_epoch == count_epoch - 1
+        train_this_epoch = idx_epoch >= largest_cached_epoch_number
+        train_next_epoch = idx_epoch >= largest_cached_epoch_number - 1
+        test_this_epoch = (logging_info and (test_each_epoch or last_epoch)) or (
+            normalize and last_epoch
+        )
+
+        if not train_this_epoch and not train_next_epoch and not test_this_epoch:
+            continue
+
         logging.info(f"Epoch {idx_epoch+1}/{count_epoch}")
         cache_filepath = Path(f"{MODELCACHEDIR}/{cache_basename}_{idx_epoch+1}.pth")
-        if use_cache and cache_filepath.exists():
-            logging.info(f"Loading from {cache_filepath}...")
-            if training_started:
-                logging.warning(
-                    "Gaps in existing cache; training has diverged. Check timestamps!"
-                )
-            named_state_dict = torch.load(cache_filepath)
-            model.load_named_state_dict(named_state_dict)
-        else:
+
+        if train_this_epoch:
             logging.info("Training...")
-            training_started = True
             train_model(
                 model,
                 train_dataloader,
@@ -146,33 +181,37 @@ def train_and_test(
                 print_rate=print_rate,
                 noise=train_params.noise_train,
             )
-        if logger.getEffectiveLevel() >= logging.INFO and (
-            test_each_epoch or idx_epoch == count_epoch - 1
-        ):
+            if use_cache:
+                logging.info(f"Saving to {cache_filepath}...")
+                torch.save(model.named_state_dict(), cache_filepath)
+        else:
+            logging.info(f"Loading from {cache_filepath}...")
+            named_state_dict = torch.load(cache_filepath)
+            model.load_named_state_dict(named_state_dict)
+
+        if test_this_epoch:
+            if normalize and last_epoch:
+                for layer in model.store.values():
+                    layer.clear()
+            logging.info("Testing...")
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
             logging.info(f"Average Loss:  {avg_loss:<9f}")
             logging.info(f"Accuracy:      {(100*accuracy):<0.4f}%")
 
-        if use_cache:
-            logging.info(f"Saving to {cache_filepath}...")
-            torch.save(model.named_state_dict(), cache_filepath)
-
     if normalize:
         logging.info("Normalizing...")
-        cache_filepath = Path(
-            f"{MODELCACHEDIR}/{cache_basename}_{idx_epoch+1}_norm.pth"
-        )
-        for layer in model.store.values():
-            layer.clear()
-        avg_loss, accuracy = test_model(model, test_dataloader, loss_fn, device=device)
-        if use_cache:
-            torch.save(
-                normalize_values(model.named_state_dict(), model.store), cache_filepath
-            )
+        normalize_values(model.named_state_dict(), model.store)
 
-        if logger.getEffectiveLevel() >= logging.INFO:
+        if use_cache:
+            cache_filepath = Path(
+                f"{MODELCACHEDIR}/{cache_basename}_{count_epoch}_norm.pth"
+            )
+            torch.save(model.named_state_dict(), cache_filepath)
+
+        if logging_info:
+            logging.info("Testing...")
             avg_loss, accuracy = test_model(
                 model, test_dataloader, loss_fn, device=device
             )
@@ -209,6 +248,7 @@ def main() -> None:
     """Main Function"""
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.info("Imports done, running script...")
 
     args = parse_args()
 

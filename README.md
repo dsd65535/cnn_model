@@ -1,15 +1,48 @@
 CNN Model
 =========
 
+This library models the behavior of an analog convolutional neural network,
+similar to the one presented in:
+> Nikita Mirchandani. Ultra-Low Power and Robust Analog Computing
+> Circuits and System Design Framework for Machine Learning Applications
+
+It uses the PyTorch library with customized layers which model real hardware nonidealities.
+These models are informed by simulation and hardware testing,
+while hardware design is in turn informed by results from scripts in this library,
+enabling an iterative design approach.
+This library also produces the weights that are ultimately used in the hardware,
+leveraging the accurate low-level modeling during training to optimize performance.
+Finally, the library includes various high-level optimization scripts
+for tuning hyperparameters, quantization, normalization and other details,
+in addition to determining specifications for the hardware design.
+The intended flow of operation is illustrated at a high level below:
+
+![Flow](docs/images/flow.png)
+
+Organization
+------------
+
+The model can be found in `cnn_model`.
+The main entry point is `cnn_model/__main__.py`.
+All other top-level scripts are in `cnn_model/scripts`.
+
+
 Installation
 ------------
 
-To use this library, Python version 3.8 or later is required.
-Refer to https://www.python.org/ for more information.
+To use this library, Python version 3.11 is required.
+Refer to https://www.python.org/ for more information on Python.
+Note that due to PyTorch CUDA limitations, the version is currently pinned.
 
-While not required, the library can easily be installed using Poetry.
+Per PEP-518, this project uses the `pyproject.toml` format
+for defining dependencies and other packaging information.
+Thus, it can be installed using most modern methods including Pip.
+
+However, it is recommended to install this library using Poetry.
+This ensures that all dependencies are at the exact version on which they were tested,
+using to the `poetry.lock` file included.
 For official installation instructions, refer to https://python-poetry.org/.
-In short, the following command can be used:
+In short, the following is an example installation procedure:
 
     $ curl -sSL https://install.python-poetry.org | python3 -
     Retrieving Poetry metadata
@@ -49,6 +82,10 @@ This repository can be cloned as follows:
     Resolving deltas: 100% (202/202), done.
     $ cd cnn_model/
 
+Using Pip, it can be installed as follows:
+
+    $ pip install .
+
 Using Poetry, it can be installed as follows:
 
     $ poetry install
@@ -58,4 +95,14 @@ Usage
 
 Using Poetry, the top-level script can be run as follows:
 
-    $ poetry run cnn_model
+    $ poetry run python cnn_model
+
+This will create, train and test a model.
+The script caches all outputs to `./cache/models`.
+For possible arguments, run:
+
+    $ poetry run python cnn_model --help
+
+All scripts may be run directly, e.g.:
+
+    $ poetry run python cnn_model/scripts/sweep_model_parameters.py

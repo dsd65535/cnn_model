@@ -1,5 +1,5 @@
-CNN Model
-=========
+AANNTwin
+========
 
 This library models the behavior of an analog convolutional neural network,
 similar to the one presented in:
@@ -22,9 +22,9 @@ The intended flow of operation is illustrated at a high level below:
 Organization
 ------------
 
-The model can be found in `cnn_model`.
-The main entry point is `cnn_model/__main__.py`.
-All other top-level scripts are in `cnn_model/scripts`.
+The model can be found in `aanntwin`.
+The main entry point is `aanntwin/__main__.py`.
+All other top-level scripts are in `aanntwin/scripts`.
 
 
 Installation
@@ -72,15 +72,15 @@ In short, the following is an example installation procedure:
 
 This repository can be cloned as follows:
 
-    $ git clone git@github.com:dsd65535/cnn_model.git
-    Cloning into 'cnn_model'...
+    $ git clone git@github.com:dsd65535/aanntwin.git
+    Cloning into 'aanntwin'...
     remote: Enumerating objects: 301, done.
     remote: Counting objects: 100% (301/301), done.
     remote: Compressing objects: 100% (106/106), done.
     remote: Total 301 (delta 202), reused 286 (delta 191), pack-reused 0
     Receiving objects: 100% (301/301), 93.87 KiB | 814.00 KiB/s, done.
     Resolving deltas: 100% (202/202), done.
-    $ cd cnn_model/
+    $ cd aanntwin/
 
 Using Pip, it can be installed as follows:
 
@@ -95,14 +95,14 @@ Usage
 
 Using Poetry, the top-level script can be run as follows:
 
-    $ poetry run python cnn_model
+    $ poetry run python aanntwin
 
 This will create, train and test a model.
 The script caches all outputs to `./cache/models`.
 For possible arguments, run:
 
-    $ poetry run python cnn_model --help
+    $ poetry run python aanntwin --help
 
 All scripts may be run directly, e.g.:
 
-    $ poetry run python cnn_model/scripts/sweep_model_parameters.py
+    $ poetry run python aanntwin/scripts/sweep_model_parameters.py

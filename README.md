@@ -1,8 +1,8 @@
 AANNTwin
 ========
 
-This library models the behavior of an analog convolutional neural network,
-similar to the one presented in:
+The Analog ANN digital twin (AANNTwin) models the behavior of
+an analog convolutional neural network, similar to the one presented in:
 > Nikita Mirchandani. Ultra-Low Power and Robust Analog Computing
 > Circuits and System Design Framework for Machine Learning Applications
 
@@ -17,7 +17,7 @@ for tuning hyperparameters, quantization, normalization and other details,
 in addition to determining specifications for the hardware design.
 The intended flow of operation is illustrated at a high level below:
 
-![Flow](docs/images/flow.png)
+![AANNTwin Overview](docs/images/aanntwin_overview.png)
 
 Organization
 ------------
